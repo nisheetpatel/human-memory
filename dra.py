@@ -8,7 +8,8 @@ class DynamicResourceAllocator:
                 learning_q=0.2, discount=0.95, nTraj=10, \
                 lmda=1, beta=10, gradient='A', model='dra',\
                 decay=1, nGradUpdates=10, updateFreq=100, \
-                printFreq=100, printUpdates=True, n_stages=2):
+                printFreq=100, printUpdates=True, n_stages=2,
+                noPenaltyForSingleActions=False):
         self.episodes       = episodes
         self.learning_q     = learning_q
         self.learning_sigma = learning_sigma
@@ -40,15 +41,19 @@ class DynamicResourceAllocator:
         self.decay      = decay
         self.c          = 1     # could be optimized
 
-        # For frequency based model with decay:
-        """ This formulation is only good if the decay parameter
-        needs to be optimized. Otw. it is very expensive to keep a
-        a matrix of all episode trajectories in memory."""
-        # Size: |(s,a)| x episodes; episode added at runtime
-        # Keeps track of which (s,a) pairs were visited per episode
-        # if self.model == 'freqBased':
-        #     self.visits = np.zeros((len(self.n_visits),1))
-        #     self.n_visits_weighted = self.n_visits.copy()
+        # Indices to fix: sigma = sigmaBase for these
+        self.noPenaltyForSingleActions = \
+            noPenaltyForSingleActions
+
+        if self.noPenaltyForSingleActions:
+            self.fixed_ids = []
+            if n_stages == 2:
+                id_set = [1,3,5,7]
+            elif n_stages == 3:
+                id_set = [1,3,5,7,9,11]
+            for ii in id_set:
+                self.fixed_ids.extend([4*ii + jj \
+                    for jj in range(4)])
 
 
     def softmax(self, x):
@@ -190,6 +195,10 @@ class DynamicResourceAllocator:
         # Set all sigmas greater than sigmaBase to sigmaBase
         self.sigma[self.sigma > self.sigmaBase] = self.sigmaBase
 
+        # No penalty for single actions
+        if self.noPenaltyForSingleActions:
+            self.sigma[self.fixed_ids] = self.sigmaBase
+
         return self.computeCost() - self.computeExpectedReward()
 
 
@@ -267,29 +276,37 @@ class DynamicResourceAllocator:
             # Updating sigmas
             self.sigma += self.learning_sigma * \
                             (grad_mean - self.lmda * grad_cost)
-            self.sigma  = np.clip(self.sigma, 0.01, self.sigmaBase)
+
+            # No penalty for single actions
+            if self.noPenaltyForSingleActions:
+                self.sigma[self.fixed_ids] = self.sigmaBase
 
         # Gradient-free optimization
         else:
-            # scipy optimize
+            # set upper bound for search and normalization
             if self.model == 'freqBased':
-                ub = np.max(self.c + np.sqrt(self.n_visits_w)) \
-                    * self.sigmaBase
-                res = minimize_scalar(self.minusObjective,\
-                    method='Bounded', bounds=[0.01,ub])
-                self.sigma = res.x / \
-                    (self.c + np.sqrt(self.n_visits_w))
-                self.sigma[self.sigma > self.sigmaBase] = self.sigmaBase
+                norm = (self.c + np.sqrt(self.n_visits_w))
+                ub = np.max(norm) * self.sigmaBase
 
             elif self.model == 'equalPrecision':
+                norm = 1
                 ub = self.sigmaBase
-                res = minimize_scalar(self.minusObjective,\
-                    method='Bounded', bounds=[0.01,ub])
-                self.sigma[:] = res.x
-            
-            # Set terminal states' sigma to sigmaBase
-            self.sigma[-1] = self.sigmaBase
 
+            # Optimize
+            res = minimize_scalar(self.minusObjective,\
+                    method='Bounded', bounds=[0.01,ub])
+            self.sigma = res.x / norm
+        
+        # For all models
+        # Set terminal states' sigma to sigmaBase
+        self.sigma[-1] = self.sigmaBase
+
+        # Clip sigma to be less than sigmaBase
+        self.sigma[self.sigma > self.sigmaBase] = self.sigmaBase
+
+        # No penalty for single actions: fix to sigmaBase
+        if self.noPenaltyForSingleActions:
+            self.sigma[self.fixed_ids] = self.sigmaBase
 
 
     def train(self):
@@ -343,7 +360,7 @@ if __name__ == '__main__':
     import numpy as np
     import pickle
 
-    model = DynamicResourceAllocator(episodes=5000, printFreq=100)
+    model = DynamicResourceAllocator(episodes=1000, printFreq=100)
     model.train()
     df = model.memoryTable
-    df.to_pickle(f'./figures/Rangel/bottleneckTask/df_{model.model}')
+    df.to_pickle(f'./figures/df_{model.model}')
