@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 from scipy.optimize import minimize_scalar
-from scripts.task import BottleneckTask
+from task import BottleneckTask
 
 class DynamicResourceAllocator:
     def __init__(self, episodes=int(1e4), learning_sigma=0.25,\

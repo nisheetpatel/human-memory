@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
-from scripts.task import BottleneckTask
-from scripts.dra import DynamicResourceAllocator
+from task import BottleneckTask
+from dra import DynamicResourceAllocator
 import multiprocessing as mp
 from time import time
 import datetime
@@ -13,12 +13,19 @@ sns.set()
 n_restarts  = 5
 episodes    = 1000
 extraEps    = 501
+n_stages    = 3
 
 # Defining key states and actions for bottleneck task
-keyStates  = [5, 6, 16, 17, 27, 28]
-keyStates0 = [5, 16, 27]
-correctAct = [7, 9, 18, 20, 29, 31]
-keyActions = [7, 8, 9, 10, 18, 19, 20, 21, 29, 30, 31, 32]
+keyStates  = [5, 6, 16, 17] 
+keyStates0 = [5, 16]
+correctAct = [7, 9, 18, 20]
+keyActions = [7, 8, 9, 10, 18, 19, 20, 21]
+
+if n_stages == 3:
+    keyStates.extend([27, 28])
+    keyStates0.extend([27])
+    correctAct.extend([29, 31])
+    keyActions.extend([29, 30, 31, 32])
 
 
 # Defining the function to be run in parallel across models
@@ -185,8 +192,20 @@ for model in results:
         df = pd.concat( [df, model.results], \
             ignore_index=True, sort=False)
 
-# Path to save
-savePath = './figures/Rangel/bottleneckTask_newest/3_3/'
+
+# Creating a directory to save the results in
+import os
+
+# define the name of the directory to be created
+savePath = f"./figures/{n_stages}"
+
+try:
+    os.mkdir(savePath)
+except OSError:
+    print ("Creation of the directory %s failed" % savePath)
+else:
+    print ("Successfully created the directory %s " % savePath)
+
 
 # Plotting Objective, expected reward, cost
 for toPlot in ['Objective', 'Expected reward', 'Cost']:
