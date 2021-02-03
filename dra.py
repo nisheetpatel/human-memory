@@ -289,7 +289,7 @@ class DynamicResourceAllocator:
                 ub = np.max(norm) * self.sigmaBase
 
             elif self.model == 'equalPrecision':
-                norm = 1
+                norm = np.ones(self.sigma.shape)
                 ub = self.sigmaBase
 
             # Optimize

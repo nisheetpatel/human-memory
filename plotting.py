@@ -13,7 +13,7 @@ sns.set()
 n_restarts  = 5
 episodes    = 1000
 extraEps    = 501
-n_stages    = 3
+n_stages    = 2
 
 # Defining key states and actions for bottleneck task
 keyStates  = [5, 6, 16, 17] 
@@ -30,7 +30,7 @@ if n_stages == 3:
 
 # Defining the function to be run in parallel across models
 def train_model(modelType, lmda=1, episodes=episodes,\
-    extraEps=extraEps, computeFreq=20, n_stages=3):
+    extraEps=extraEps, computeFreq=20, n_stages=n_stages):
     """
     Trains model = {modelType} for {episodes} episodes
     with stochastic choice sets, then for an additional
@@ -56,7 +56,8 @@ def train_model(modelType, lmda=1, episodes=episodes,\
     model = DynamicResourceAllocator(model=mType, \
         lmda=1, episodes=computeFreq, decay=decay, \
         nGradUpdates=20, updateFreq=int(computeFreq/2),\
-        printFreq=1, printUpdates=False, n_stages=n_stages)
+        printFreq=1, printUpdates=False, n_stages=n_stages,\
+        noPenaltyForSingleActions=True)
 
     # initialising columns for dataframe 
     col_model, col_episode, col_state, col_action, \
@@ -197,7 +198,7 @@ for model in results:
 import os
 
 # define the name of the directory to be created
-savePath = f"./figures/{n_stages}"
+savePath = f"./figures/{n_stages}_noPenalty/"
 
 try:
     os.mkdir(savePath)
@@ -276,3 +277,14 @@ for modelType in modelTypes:
      f'{str(datetime.timedelta(seconds=time()-start))}')
 
 plt.close('all')
+
+# Saving the dataframe and models
+import pickle
+
+fh = open(f'{savePath}df','wb')
+pickle.dump(df, fh, pickle.HIGHEST_PROTOCOL)
+fh.close()
+
+fh = open(f'{savePath}models','wb')
+pickle.dump(results, fh, pickle.HIGHEST_PROTOCOL)
+fh.close()
