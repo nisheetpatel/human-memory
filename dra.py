@@ -8,8 +8,9 @@ class DynamicResourceAllocator:
                 learning_q=0.2, discount=0.95, nTraj=10, \
                 lmda=1, beta=10, gradient='A', model='dra',\
                 decay=1, nGradUpdates=10, updateFreq=100, \
-                printFreq=100, printUpdates=True, n_stages=2,
-                noPenaltyForSingleActions=False):
+                printFreq=100, printUpdates=True, n_stages=2,\
+                noPenaltyForSingleActions=False, decay1=0.98,
+                version=1):
         self.episodes       = episodes
         self.learning_q     = learning_q
         self.learning_sigma = learning_sigma
@@ -18,7 +19,7 @@ class DynamicResourceAllocator:
         self.nTraj          = nTraj
         self.lmda           = lmda
         self.beta           = beta
-        self.env            = BottleneckTask(n_stages=n_stages)
+        self.env            = BottleneckTask(n_stages=n_stages, version=version)
         self.printFreq      = printFreq
         self.printUpdates   = printUpdates
         self.updateFreq     = updateFreq
@@ -31,15 +32,17 @@ class DynamicResourceAllocator:
 
         # Initialising q-distribution: N(q, diag(sigma)^2)
         self.q  = np.zeros(self.env.q_size)
-        self.sigma0     = 20
+        self.sigma0     = 25
         self.sigmaBase  = 50
         self.sigma      = np.ones(self.q.shape) * self.sigma0
 
         # Initialising visit frequency
         self.n_visits   = 1e-5*np.ones(self.sigma.shape)
         self.n_visits_w = 1e-5*np.ones(self.sigma.shape)
+        self.n_visits_w1= 1e-5*np.ones(self.sigma.shape)
         self.decay      = decay
-        self.c          = 1     # could be optimized
+        self.decay1     = decay1
+        self.c          = 0.1     # could be optimized
 
         # Indices to fix: sigma = sigmaBase for these
         self.noPenaltyForSingleActions = \
@@ -129,6 +132,8 @@ class DynamicResourceAllocator:
             self.n_visits[idx_list] += 1
             self.n_visits_w = self.decay * self.n_visits_w
             self.n_visits_w[idx_list] += 1
+            self.n_visits_w1= self.decay1 * self.n_visits_w1
+            self.n_visits_w1[idx_list] += 1
 
         return tot_reward
 
@@ -302,7 +307,7 @@ class DynamicResourceAllocator:
         self.sigma[-1] = self.sigmaBase
 
         # Clip sigma to be less than sigmaBase
-        self.sigma[self.sigma > self.sigmaBase] = self.sigmaBase
+        self.sigma = np.clip(self.sigma, 0.01, self.sigmaBase)
 
         # No penalty for single actions: fix to sigmaBase
         if self.noPenaltyForSingleActions:
@@ -336,6 +341,10 @@ class DynamicResourceAllocator:
                 # find optimum every updateFreq episodes
                 if (ii+1) % self.updateFreq == 0:
                     self.allocateResources()
+                    cost = self.computeCost()
+                    while (cost < 5) | (cost > 18):
+                        self.allocateResources()
+                        cost = self.computeCost()
 
         return
 
@@ -347,8 +356,8 @@ class DynamicResourceAllocator:
             'transition':    self.env.transitions[:,1],\
             'q':             np.around(self.q,1),\
             'sigma':         np.around(self.sigma,1), \
-            'freq. visit':   self.n_visits.astype(int),\
-            'freq. visit w': np.around(self.n_visits_w, 2) })
+            'n visit':   self.n_visits.astype(int),\
+            'n visit w': np.around(self.n_visits_w, 2) })
         return df
 
 
