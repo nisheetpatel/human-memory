@@ -8,11 +8,14 @@ import datetime
 
 # initializing hyperparameters
 n_restarts  = 10
-episodes    = 500
+episodes    = 1000
 extraEps    = 0
 n_stages    = 2
-version     = 1
-noPenalty   = False
+version     = 2
+lmda        = 2
+sigmaBase   = 50
+computeFreq = 50
+noPenalty   = True
 
 # Defining key states and actions for bottleneck task
 keyStates  = [5, 6, 16, 17] 
@@ -29,9 +32,9 @@ if n_stages == 3:
 
 # Defining the function to be run in parallel across models
 def train_model(modelType=None, model=None, \
-    episodes=episodes, computeFreq=50, \
-    lmda=2, n_stages=n_stages, version=version,\
-    noPenalty=noPenalty):
+    episodes=episodes, computeFreq=computeFreq,\
+    lmda=lmda, n_stages=n_stages, version=version,\
+    noPenalty=noPenalty, sigmaBase=sigmaBase):
     """
     Trains model = {modelType} for {episodes} episodes
     with stochastic choice sets, then for an additional
@@ -58,15 +61,17 @@ def train_model(modelType=None, model=None, \
             decay = float(modelType.split()[1])
 
         model = DynamicResourceAllocator(\
-            model        =mType,\
-            lmda         =lmda,\
-            episodes     =computeFreq,\
-            decay        =decay,\
-            n_stages     =n_stages,\
-            nGradUpdates =20,\
-            updateFreq   =int(computeFreq/2),\
-            printFreq    =50, \
-            printUpdates =True,\
+            model        = mType,\
+            lmda         = lmda,\
+            version      = version,\
+            episodes     = computeFreq,\
+            decay        = decay,\
+            n_stages     = n_stages,\
+            sigmaBase    = sigmaBase,\
+            nGradUpdates = 20,\
+            updateFreq   = int(computeFreq/2),\
+            printFreq    = 50, \
+            printUpdates = False,\
             noPenaltyForSingleActions=noPenalty)
     
     elif (model != None):
@@ -203,15 +208,16 @@ def train_model(modelType=None, model=None, \
 
 
 
-def save_results(results, n_stages=n_stages, \
-    noPenalty=noPenalty, version=version):
+def save_results(results, n_stages=n_stages, when='before',
+    noPenalty=noPenalty, version=version,):
 
     # Creating a directory to save the results in
     import os
     import pickle
 
     # define the name of the directory to be created
-    str_append = f'{n_stages}_v' + str(version)
+    str_append = f'{n_stages}_v' + str(version) + \
+        f'_lmda{lmda}_sigBase{sigmaBase}'
 
     if noPenalty:
         str_append += f'_noPenalty'
@@ -235,11 +241,11 @@ def save_results(results, n_stages=n_stages, \
                 ignore_index=True, sort=False)
 
     # Saving results in savePath
-    fh = open(f'{savePath}df_before','wb')
+    fh = open(f'{savePath}df_{when}','wb')
     pickle.dump(df, fh, pickle.HIGHEST_PROTOCOL)
     fh.close()
 
-    fh = open(f'{savePath}models_before','wb')
+    fh = open(f'{savePath}models_{when}','wb')
     pickle.dump(results, fh, pickle.HIGHEST_PROTOCOL)
     fh.close()
 
@@ -249,23 +255,18 @@ def save_results(results, n_stages=n_stages, \
 
 if __name__ == '__main__':
     # Defining model types to train
-    modelTypes = ['dra', 'equalPrecision', 'freq 1',\
+    modelTypes = ['dra', 'equalPrecision', 'freq 1',
                 'freq 0.97', 'freq 0.95', 'freq 0.9']
 
     # Running in parallel
     pool = mp.Pool()
-    results = pool.map(train_model, \
-        np.repeat(modelTypes, n_restarts))
+    results = pool.map(train_model, np.repeat(modelTypes, n_restarts))
 
     savePath = save_results(results)
 
-    """
-    # Retraining after removing stochastic choice sets
-    # Note!!!
-    # Redefine the train_model function
 
-    argsToPass = [(None,model,250) for model in results]
+    # Retraining after removing stochastic choice sets
+    argsToPass = [(None,model,500) for model in results]
     results2 = pool.starmap(train_model, argsToPass)
 
-    savePath = save_results(results2)
-    """
+    savePath = save_results(results2, when='after')
