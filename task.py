@@ -10,12 +10,13 @@ class BottleneckTask:
     # @states:              State indices
     def __init__(self, n_stages=2, stochastic_rewards=True,\
                 stochastic_choice_sets=True, version=1):
+        self.version = version
         self.start_state = 0
         self.state = self.start_state
         self.stochastic_rewards = stochastic_rewards
         self.stochastic_choice_sets = stochastic_choice_sets
 
-        # Defining one task stage
+        # Defining one stage of the task (to be repeated)
         self.module = np.mat('1 1 1 1 0 0 0 0 0 0 0;\
                               0 0 0 0 1 0 0 0 0 0 0;\
                               0 0 0 0 1 0 0 0 0 0 0;\
@@ -42,14 +43,23 @@ class BottleneckTask:
         self.states = np.arange(self.n_states)
         self.transitions = np.transpose(self.transition_matrix.nonzero())
         
-        # Defining rewards
+        # Defining rewards for version 1:
+        # key states:                   if 3 stages:
+        # p_visit = (.5, .5, .8, .2)    + (.8, .2)
+        # dq      = (40, 20, 25, 40)    + (15, 30)
         rewards1 = np.array([0, 140, 50, 100,  20, 0, 0, 20, -20, 20,   0])
-        rewards2 = np.array([0,  60,  0,  20, -20, 0, 0, 20,   0, 20, -20])
-        rewards3 = np.array([0, 140, 40, 100,  70, 0, 0, 20,  10, 20, -10])
+        rewards2 = np.array([0,  60,  0,  20, -20, 0, 0, 20,  -5, 20, -20])
+        rewards3 = np.array([0, 140, 40, 100,  70, 0, 0, 20,   5, 20, -10])
 
         if version==2:
-            rewards2 = np.array([0,  60,  0,  20, -20, 0, 0, 20, -5, 20, -20])
+            # p_visit = (.8, .2, .8, .2)    + (.8, .2)
+            # dq      = (40, 20, 25, 40)    + (15, 30)
             rewards3 = np.array([0, 140, 50,  100, 20, 0, 0, 20, 10, 20, -10])
+        
+        elif version == 3:
+            # p_visit = (.6, .4, .8, .2)    + (.8, .2)
+            # dq      = (40, 20, 25, 40)    + (15, 30)
+            rewards1 = np.array([0, 140, 20, 100,  50, 0, 0, 20, -20, 20,   0])
 
         if n_stages == 2:
             self.rewards = np.hstack((rewards1, rewards2, 0))
@@ -81,30 +91,40 @@ class BottleneckTask:
 
             if np.mod(self.state,11) != 0:
                 # Bottleneck states are 0, 11, 22
-                return self.actions[self.state]
+                choiceSet = self.actions[self.state]
 
             elif self.state == 0:
-                # Optimal agent visits states 5 or 6 with prob 0.5 & 0.5
                 choiceList = [[1,2], [1,3], [1,4], [2,3], [2,4], [3,4]]
-                return random.choices(choiceList, weights=(1,1,1,2,1,2), k=1)[0]
+
+                if self.version == 1:
+                    # p_visit(5,6) = (.5, .5)
+                    choiceSet = random.choices(choiceList, weights=(1,1,1,2,1,2), k=1)[0]
+                
+                else:
+                    # version 2: p_visit(5,6) = (.8, .2)
+                    # version 3: p_visit(5,6) = (.6, .4)    (bec of diff. rewards)
+                    choiceSet = random.choices(choiceList, weights=(2,2,2,1,2,1), k=1)[0]
 
             elif self.state == 11:
-                # Optimal agent visits states 16 or 17 with prob 0.8 and 0.2
+                # p_visit(16,17) = (.8, .2)
                 choiceList = [[12,13], [12,14], [12,15], [13,14], [13,15], [14,15]]
-                return random.choices(choiceList, weights=(2,2,2,1,2,1), k=1)[0]
+                choiceSet = random.choices(choiceList, weights=(2,2,2,1,2,1), k=1)[0]
 
             elif self.state == 22:
-                # Optimal agent visits states 16 or 17 with prob 0.8 and 0.2
+                # p_visit(27,28) = (.8, .2)
                 choiceList = [[23,24], [23,25], [23,26], [24,25], [24,26], [25,26]]
-                return random.choices(choiceList, weights=(2,2,2,1,2,1), k=1)[0]
+                choiceSet = random.choices(choiceList, weights=(2,2,2,1,2,1), k=1)[0]
+
         else:
-            return self.actions[self.state]
+            choiceSet = self.actions[self.state]
+        
+        return choiceSet
 
     # point to location in q-table
     def idx(self, state, action):
         ii  = np.logical_and(self.transitions[:,0]==state,\
                     self.transitions[:,1]==action)
-        return int(np.argwhere(ii))
+        return np.searchsorted(ii, True) - 1
 
     # step in the environment
     def step(self, action):
