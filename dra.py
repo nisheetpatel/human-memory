@@ -10,7 +10,7 @@ class DynamicResourceAllocator:
                 decay=1, nGradUpdates=10, updateFreq=100, \
                 printFreq=100, printUpdates=True, n_stages=2,\
                 noPenaltyForSingleActions=False, decay1=0.98,
-                version=1):
+                version=1, sigmaBase=50):
         self.episodes       = episodes
         self.learning_q     = learning_q
         self.learning_sigma = learning_sigma
@@ -33,7 +33,7 @@ class DynamicResourceAllocator:
         # Initialising q-distribution: N(q, diag(sigma)^2)
         self.q  = np.zeros(self.env.q_size)
         self.sigma0     = 25
-        self.sigmaBase  = 50
+        self.sigmaBase  = sigmaBase
         self.sigma      = np.ones(self.q.shape) * self.sigma0
 
         # Initialising visit frequency
