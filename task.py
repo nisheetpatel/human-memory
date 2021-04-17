@@ -3,6 +3,85 @@ import pandas as pd
 import random
 import scipy.linalg
 
+class RangelTask:
+    # @n_states:    Number of states
+    # @states:      State indices
+    # @pstate:      probability of state occurance
+    # @task:        standard or precision measuring (PMT)
+    def __init__(self):
+        
+        self.n_states = 4
+        self.states = np.arange(self.n_states)
+        self.pstate = [.4,.4,.1,.1]
+        self.state = self.reset()
+        self.task = 'standard'
+
+        # Defining rewards:
+        delta_1 = 4
+        delta_2 = 2
+        self.rewards = [10 + delta_1,  10,  10 - delta_1,
+                        10 + delta_2,  10,  10 - delta_2,
+                        10 + delta_1,  10,  10 - delta_1,
+                        10 + delta_2,  10,  10 - delta_2]
+
+        # actions and size of the q-table
+        self.actions = np.arange(self.n_states * 3)
+        self.q_size  = self.n_states * 3  + 1   # 3 actions per state
+
+
+    def reset(self):
+        self.state = random.choices(self.states,
+                weights=self.pstate, k=1) [0]
+        return self.state
+
+
+    @property
+    def action_space(self):
+        if self.task is not 'PMT':
+            # two of three options are available uniformly at random
+            c1 = np.array([0,1]) + 3*self.state
+            c2 = np.array([0,2]) + 3*self.state
+            c3 = np.array([1,2]) + 3*self.state
+            choiceList = [c1, c2, c3]
+            choiceSet = random.choices(choiceList)[0]
+        else:
+            choiceSet = 0 # currently not implemented
+
+        return choiceSet
+
+    # point to location in q-table
+    def idx(self, state, action):
+        if state == None:
+            idx = -1    # episode terimated
+        else:
+            idx = action
+        return idx
+
+    # step in the environment
+    def step(self, action):
+        # next state
+        next_state = None
+
+        # reward
+        reward = self.rewards[action]
+        reward += np.random.randn()     # stochastic rewards
+
+        # termination and info/logs
+        done = True     # unless PMT; currently not implemented
+        info = None
+        # if PMT trial: 
+        #   done = false
+        #   next_state = spl. state        # design these ones
+        #   info = [index_option, payoff_detOption, allocGrad?]
+        # else: 
+        #   done = True
+        #   info = None
+
+        return next_state, reward, done, info
+
+
+
+
 class BottleneckTask:
     # @transition_matrix:   State transition matrix
     # @reward_matrix:       Rewards corresponding to state transitions
@@ -322,96 +401,3 @@ class Maze:
         self.obstacles = [x for x in self.obstacles if x not in self.old_obstacles]
         self.GOAL_STATES = self.new_goal
         return
-
-
-""" 
-Modified mazes for experiments with Rangel.
-"""
-class RangelMaze:
-    def __init__(self, version=0, stochastic_rewards=True):
-        self.version = version
-        self.stochastic_rewards = stochastic_rewards
-
-        # maze width
-        self.WORLD_WIDTH = 8
-
-        # maze height
-        self.WORLD_HEIGHT = 7
-
-        # all possible actions
-        self.ACTION_UP = 0
-        self.ACTION_DOWN = 1
-        self.ACTION_LEFT = 2
-        self.ACTION_RIGHT = 3
-        self.actions = [self.ACTION_UP, self.ACTION_DOWN, self.ACTION_LEFT, self.ACTION_RIGHT]
-
-        if self.version==0:
-            # start state
-            self.START_STATE = [4, 3]
-
-            # goal state
-            self.GOAL_STATES = [[0, 5]]
-
-            # all obstacles
-            self.obstacles = [[4, 0], [1, 3], [2, 3], [4, 5]]
-
-            # positive reward states
-            self.rewarding_states = [[2,1], [5,1], [2,6], [5,6]]
-
-            # negative reward states
-            self.aversive_states = [[2,4], [3,6]]
-            
-        elif self.version==1:
-            self.START_STATE = [5, 2]
-
-            # goal state
-            self.GOAL_STATES = [[1, 5]]
-
-            # all obstacles
-            self.obstacles = [[2, 2], [3, 2], [4, 4], [4, 5]]
-
-            # positive reward states
-            self.rewarding_states = [[1,1], [5,6]]
-
-            # negative reward states
-            self.aversive_states = []
-
-        # the size of q value
-        self.q_size = (self.WORLD_HEIGHT, self.WORLD_WIDTH, len(self.actions))
-
-        # max steps
-        self.max_steps = float('inf')
-
-        # track the resolution for this maze
-        self.resolution = 1
-
-    # take @action in @state
-    # @return: [new state, reward]
-    def step(self, state, action):
-        x, y = state
-
-        # next state
-        if action == self.ACTION_UP:
-            x = max(x - 1, 0)
-        elif action == self.ACTION_DOWN:
-            x = min(x + 1, self.WORLD_HEIGHT - 1)
-        elif action == self.ACTION_LEFT:
-            y = max(y - 1, 0)
-        elif action == self.ACTION_RIGHT:
-            y = min(y + 1, self.WORLD_WIDTH - 1)
-        if [x, y] in self.obstacles:
-            x, y = state
-
-        # reward
-        if [x, y] in self.GOAL_STATES:
-            reward = 50
-        elif [x, y] in self.rewarding_states:
-            reward = 2
-        elif [x, y] in self.aversive_states:
-            reward = -3
-        else:
-            reward = -1
-        if self.stochastic_rewards:
-            reward += np.random.randn()
-
-        return [x, y], reward

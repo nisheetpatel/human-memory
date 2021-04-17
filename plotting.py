@@ -77,6 +77,26 @@ plt.savefig(f'{savePath}Obs_P_mistake_lines_beforeSwitch')
 plt.show()
 
 
+# Noisy memories (instead of sigma)
+import scipy.stats as stats
+import math
+sns.set_style("white")
+
+for modelType in modelTypes:
+    q = [20, -20, 20, -5, 20, -5, 20, -20]
+    sig = [df['Sigma']
+            [(df['Model']==modelType) & (df['Action']==a)]
+            .median()
+            for a in keyActions]
+    stateMap = {'0':5, '2':6, '4':16, '6':17}
+    for i in [0,2,4,6]:
+        x = np.linspace(-150, 150, 1000)
+        plt.plot(x, stats.norm.pdf(x, q[i], sig[i]))
+        plt.plot(x, stats.norm.pdf(x, q[i+1], sig[i+1]))
+        plt.title(f'State = {stateMap[str(i)]}, Model = {modelType}')
+        plt.show()
+
+
 ####################################################
 #                                                  #
 # Task manipulation: remove stochastic choice sets #
