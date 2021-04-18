@@ -8,13 +8,16 @@ class RangelTask:
     # @states:      State indices
     # @pstate:      probability of state occurance
     # @task:        standard or precision measuring (PMT)
-    def __init__(self):
+    def __init__(self, episodes=1500, n_pmt=20):
         
-        self.n_states = 4
+        # states, acitons, and probability of occurance of states
+        self.n_states = 12 * 3
         self.states = np.arange(self.n_states)
-        self.pstate = [.4,.4,.1,.1]
-        self.state = self.reset()
-        self.task = 'standard'
+        #self.pstate = [.4]*6 + [.1]*6 + [0]*24
+        
+        # actions and size of the q-table
+        self.actions = np.arange(12 * 3)    # normal, PMT+, PMT-
+        self.q_size  = self.actions + 1     # terminal
 
         # Defining rewards:
         delta_1 = 4
@@ -23,59 +26,100 @@ class RangelTask:
                         10 + delta_2,  10,  10 - delta_2,
                         10 + delta_1,  10,  10 - delta_1,
                         10 + delta_2,  10,  10 - delta_2]
+        # The steps below shouldn't be necessary, but I'm including them
+        big_delta = 1.5
+        self.rewards += list(np.array(self.rewards) + big_delta) +\
+                        list(np.array(self.rewards) - big_delta)    
 
-        # actions and size of the q-table
-        self.actions = np.arange(self.n_states * 3)
-        self.q_size  = self.n_states * 3  + 1   # 3 actions per state
+        
+        # Experimental design: selecting the sequence of states
+        self.episode = 0
+        
+        # pre-generating the sequence of states
+        states = np.append(np.repeat(np.arange(6),4), np.arange(6,12), axis=0)
+        states_training = np.repeat(states, 500/len(states) )
+        np.random.shuffle(states_training)
+        states_PMT = np.repeat(states, (episodes-500)/len(states) )
+        np.random.shuffle(states_PMT)
+        self.states_pregen = np.append(states_training, states_PMT)
+        self.states_pregen = np.append(states_PMT[:(episodes-len(self.states_pregen))], self.states_pregen)
+        
+        # current state and next states
+        self.state = self.states_pregen[self.episode]
+        self.pmt_trial = np.zeros(len(self.states_pregen))      # unused; could discard
+        self.next_states = np.array([None]*len(self.states_pregen))
+        
+        # picking PMT trial indices and type (+Delta or -Delta)
+        for ii in range(12):
+            idx_ii = np.where(self.states_pregen == ii)[0]  # get index where state == ii
+            idx_ii = idx_ii[idx_ii>500]                     # throw away training indices
+            np.random.shuffle(idx_ii)                       # shuffle what's left
+            idx_ii = idx_ii[:n_pmt]                         # pick n_pmt indices (random)
+            self.pmt_trial[idx_ii] = 1
+            # for first half: next_state is option vs. +Delta deterministic option
+            self.next_states[ idx_ii[ :int(len(idx_ii)/2) ] ] = \
+                 self.states_pregen[ idx_ii[ :int(len(idx_ii)/2) ] ] + 12
+            # for second half: -Delta deterministic option
+            self.next_states[ idx_ii[ int(len(idx_ii)/2): ] ] = \
+                 self.states_pregen[ idx_ii[ int(len(idx_ii)/2): ] ] + 24
+
+        # set current state
+        self.state = self.reset()
 
 
-    def reset(self):
-        self.state = random.choices(self.states,
-                weights=self.pstate, k=1) [0]
+    def reset(self, newEpisode=False):
+        self.state = self.states_pregen[self.episode]
+        if newEpisode:
+            self.episode += 1
         return self.state
 
 
     @property
     def action_space(self):
-        if self.task is not 'PMT':
-            # two of three options are available uniformly at random
-            c1 = np.array([0,1]) + 3*self.state
-            c2 = np.array([0,2]) + 3*self.state
-            c3 = np.array([1,2]) + 3*self.state
-            choiceList = [c1, c2, c3]
-            choiceSet = random.choices(choiceList)[0]
-        else:
-            choiceSet = 0 # currently not implemented
-
+        if self.state < 12:
+            if self.state % 3 == 0:
+                choiceSet = [self.state + 1, self.state + 2]    # 1 v 2; PMT 0
+            elif self.state % 3 == 1:
+                choiceSet = [self.state - 1, self.state + 1]    # 0 v 2; PMT 1
+            else:
+                choiceSet = [self.state - 2, self.state - 1]    # 0 v 1; PMT 2
+        elif self.state < 24:
+            choiceSet = [self.state - 12, self.state]
+        elif self.state < 36:
+            choiceSet = [self.state - 24, self.state]
         return choiceSet
 
     # point to location in q-table
     def idx(self, state, action):
-        if state == None:
-            idx = -1    # episode terimated
+        if state >= 12:     # episode terimated
+            idx = -1    
         else:
             idx = action
         return idx
 
     # step in the environment
     def step(self, action):
+        # info: [allocGrad?, updateQ=False]
+        if self.state < 12:
+            info = [True, True]
+        else:
+            info = [False, False]
+
         # next state
-        next_state = None
+        next_state = self.next_states[self.episode].copy()
+        self.state = next_state
+        self.next_states[self.episode] = None
 
         # reward
         reward = self.rewards[action]
-        reward += np.random.randn()     # stochastic rewards
+        if action < 12:
+            reward += np.random.randn()     # stochastic rewards
 
-        # termination and info/logs
-        done = True     # unless PMT; currently not implemented
-        info = None
-        # if PMT trial: 
-        #   done = false
-        #   next_state = spl. state        # design these ones
-        #   info = [index_option, payoff_detOption, allocGrad?]
-        # else: 
-        #   done = True
-        #   info = None
+        # termination
+        if next_state is None:  # if regular trial
+           done = True
+        else:
+            done = False
 
         return next_state, reward, done, info
 
