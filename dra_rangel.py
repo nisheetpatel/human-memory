@@ -4,11 +4,14 @@ from scipy.optimize import minimize_scalar
 from task import RangelTask
 
 class DynamicResourceAllocator:
-    def __init__(self, episodes=int(1e4), learning_sigma=0.25,\
+    def __init__(self, episodes=1500, learning_sigma=0.2,\
                 learning_q=0.2, discount=0.95, nTraj=10, \
-                lmda=1, beta=10, gradient='A', model='dra',\
-                decay=1, nGradUpdates=10, updateFreq=100, \
-                printFreq=100, printUpdates=True, decay1=0.98, sigmaBase=5):
+                lmda=0.1, beta=10, gradient='A', model='dra',\
+                decay=1, nGradUpdates=2, updateFreq=25, \
+                printFreq=50, printUpdates=True, decay1=0.98, \
+                sigmaBase=5, learnPMT=False):
+
+        self.env            = RangelTask(learnPMT=learnPMT)
         self.episodes       = episodes
         self.learning_q     = learning_q
         self.learning_sigma = learning_sigma
@@ -17,7 +20,6 @@ class DynamicResourceAllocator:
         self.nTraj          = nTraj
         self.lmda           = lmda
         self.beta           = beta
-        self.env            = RangelTask()
         self.printFreq      = printFreq
         self.printUpdates   = printUpdates
         self.updateFreq     = updateFreq
@@ -34,6 +36,12 @@ class DynamicResourceAllocator:
         self.sigmaBase  = sigmaBase
         self.sigma      = np.ones(self.q.shape) * self.sigma0
 
+        # Indices to fix: sigma = 0 and q = rewards (known)
+        self.fixed_ids = np.arange(12,len(self.sigma)-1)
+        self.q[self.fixed_ids] = np.array(self.env.rewards)[self.fixed_ids]
+        self.sigma[self.fixed_ids] = 0
+        self.sigma[-1] = 0
+
         # Initialising visit frequency
         self.n_visits   = 1e-5*np.ones(self.sigma.shape)
         self.n_visits_w = 1e-5*np.ones(self.sigma.shape)
@@ -41,6 +49,9 @@ class DynamicResourceAllocator:
         self.decay      = decay
         self.decay1     = decay1
         self.c          = 0.1     # could be optimized
+
+        # Initialising array to record choices
+        self.choicePMT  = np.ones(len(self.env.episodes))
 
 
     def softmax(self, x):
@@ -59,7 +70,7 @@ class DynamicResourceAllocator:
         the choice set available. These are required for resource
         allocation by SGD for DRA.
         """
-        # actions available and pointer for q-table
+        # fetch available actions and pointer for q-table
         actions = self.env.action_space
         idx     = [self.env.idx(state,a) for a in actions]
 
@@ -74,7 +85,7 @@ class DynamicResourceAllocator:
         return action, zeta_s, prob_a, actions
 
     
-    def runEpisode(self, updateQ=True):
+    def runEpisode(self, updateQ=True, newEp=False):
         """
         Run one episode of the task, update the memorized q-values if
         updateQ is True, and return reward obtained in the episode.
@@ -82,15 +93,21 @@ class DynamicResourceAllocator:
         # Initializing some variables
         tot_reward, reward = 0, 0
         done = False
-        state = self.env.reset()
+        state = self.env.reset(newEpisode=newEp)
         idx_list = []
 
         while not done:
             # Determine next action
             action, _, _, _ = self.act(state)
-                
+
+            # record choices for PMT trials:
+            if self.env.pmt_trial[self.env.episode]:
+                self.choicePMT[self.env.episode] = action
+
             # Get next state and reward
-            s1, reward, done, _ = self.env.step(action)
+            s1, reward, done, info = self.env.step(action)
+            updateQ = updateQ * info[0]
+            allocGrad = info[1]
 
             # find pointers to q-table
             idx   = self.env.idx(state,action)
@@ -111,24 +128,32 @@ class DynamicResourceAllocator:
             state = s1
             tot_reward += reward
 
-        # Update visits at the end of the episode
-        if updateQ:
-            self.n_visits[idx_list] += 1
-            self.n_visits_w = self.decay * self.n_visits_w
-            self.n_visits_w[idx_list] += 1
-            self.n_visits_w1= self.decay1 * self.n_visits_w1
-            self.n_visits_w1[idx_list] += 1
+            # Update visits for each idx during episode
+            # done for current idx IFF newEp and allocGrad
+            if newEp & allocGrad:
+                self.n_visits[idx] += 1
+                self.n_visits_w = self.decay * self.n_visits_w
+                self.n_visits_w[idx] += 1
+                self.n_visits_w1= self.decay1 * self.n_visits_w1
+                self.n_visits_w1[idx] += 1
+        
+        # reset q-values for terminal state (unnecessary)
+        # q[fixed_ids] should never be updated because updateQ=False
+        self.q[-1] = 0      # terminal state
 
         return tot_reward
 
 
-    def computeExpectedReward(self, nEpisodes=100):
+    def computeExpectedReward(self, nEpisodes=500):
         """
         Compute expected reward for current memory distribution.
         """
         rewards = []
-        for _ in range(nEpisodes):
+        env_currentEp = self.env.episode
+        for ep in range(nEpisodes):
+            self.env.episode = ep
             rewards.append(self.runEpisode(updateQ=False))
+        self.env.episode = env_currentEp
         return np.mean(rewards)
 
 
@@ -178,13 +203,22 @@ class DynamicResourceAllocator:
             self.sigma = sigma_scalar / \
                 (self.c + np.sqrt(self.n_visits_w))
 
-        # Set terminal states' sigma to sigmaBase
+        # Set terminal states' and fixed_ids sigma to sigmaBase
+        # these are known with certainty and shouldn't cost anything
         self.sigma[-1] = self.sigmaBase
+        self.sigma[self.fixed_ids] = self.sigmaBase
 
         # Set all sigmas greater than sigmaBase to sigmaBase
         self.sigma[self.sigma > self.sigmaBase] = self.sigmaBase
 
-        return self.computeCost() - self.computeExpectedReward()
+        # Objective function to return
+        minusObj = self.computeCost() - self.computeExpectedReward()
+
+        # Resetting sigma for terminal states and fixed ids to 0
+        self.sigma[-1] = 0
+        self.sigma[self.fixed_ids] = 0
+
+        return minusObj
 
 
     def allocateResources(self):
@@ -214,7 +248,7 @@ class DynamicResourceAllocator:
                 grad  = np.zeros(self.sigma.shape)
                 done = False
                 tot_reward, reward = 0, 0
-                state = self.env.reset()
+                state = self.env.reset()  # newEp=False by default
                 r = []
 
                 while not done:
@@ -222,22 +256,24 @@ class DynamicResourceAllocator:
                     action, z, prob_a, action_space = self.act(state)
                     
                     # Get next state and reward
-                    s1, reward, done, _ = self.env.step(action)
+                    s1, reward, done, info = self.env.step(action)
+                    allocGrad = info[1]
                     r.append(reward)
 
-                    # find pointers to q-table
-                    idx    = self.env.idx(state,action)
-                    id_all = [self.env.idx(state,a) \
-                                for a in action_space]
+                    if allocGrad:
+                        # find pointers to q-table
+                        idx    = self.env.idx(state,action)
+                        id_all = [self.env.idx(state,a) \
+                                    for a in action_space]
 
-                    if self.gradient == 'A':
-                        psi = self.q[idx] - np.mean(self.q[id_all])
-                    elif self.gradient == 'Q':
-                        psi = self.q[idx]
-                    elif self.gradient == 'R':
-                        psi = 1
+                        if self.gradient == 'A':
+                            psi = self.q[idx] - np.mean(self.q[id_all])
+                        elif self.gradient == 'Q':
+                            psi = self.q[idx]
+                        elif self.gradient == 'R':
+                            psi = 1
                     
-                    if self.model == 'dra':
+                        # gradients
                         grad[id_all] -= (self.beta * z * prob_a) * psi
                         grad[idx]    += psi * (self.beta * \
                                 z[np.array(action_space) == action])
@@ -254,6 +290,11 @@ class DynamicResourceAllocator:
                     grads   += [grad]
                     # reward_list.append(tot_reward)
 
+            # Setting fixed and terminal sigmas to sigmaBase to avoid
+            # divide by zero error; reset to 0 at the end of the loop
+            self.sigma[self.fixed_ids] = self.sigmaBase
+            self.sigma[-1] = self.sigmaBase
+            
             # Compute average gradient across sampled trajs & cost
             grad_cost = (self.sigma/(self.sigmaBase**2) - 1/self.sigma)
             grad_mean = np.mean(grads, axis=0)
@@ -280,11 +321,13 @@ class DynamicResourceAllocator:
             self.sigma = res.x / norm
         
         # For all models
-        # Set terminal states' sigma to sigmaBase
-        self.sigma[-1] = self.sigmaBase
-
         # Clip sigma to be less than sigmaBase
         self.sigma = np.clip(self.sigma, 0.01, self.sigmaBase)
+
+        # Sigmas for fixed ids and terminal states = 0
+        # works because cost function altered to ignore this
+        self.sigma[self.fixed_ids] = 0
+        self.sigma[-1] = 0       
 
 
 
@@ -295,7 +338,7 @@ class DynamicResourceAllocator:
         
         for ii in range(self.episodes):
             # run episode
-            rewardObtained = self.runEpisode()
+            rewardObtained = self.runEpisode(newEp=True)
 
             # printing updates to indicate training progress
             reward_list.append(rewardObtained)
@@ -315,10 +358,6 @@ class DynamicResourceAllocator:
                 # find optimum every updateFreq episodes
                 if (ii+1) % self.updateFreq == 0:
                     self.allocateResources()
-                    cost = self.computeCost()
-                    while (cost < 5) | (cost > 18):
-                        self.allocateResources()
-                        cost = self.computeCost()
 
         return
 
@@ -334,13 +373,14 @@ class DynamicResourceAllocator:
 
 # Saving stuff
 if __name__ == '__main__':
-    # Script for plots
-    from dra import DynamicResourceAllocator
+    # basic script
+    from dra_rangel import DynamicResourceAllocator
     import pandas as pd
     import numpy as np
     import pickle
 
-    model = DynamicResourceAllocator(episodes=1000, printFreq=100)
+    model = DynamicResourceAllocator(learnPMT=False)
     model.train()
     df = model.memoryTable
+    print(df)
     df.to_pickle(f'./figures/df_{model.model}')
