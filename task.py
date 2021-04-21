@@ -8,7 +8,8 @@ class RangelTask:
     # @states:      State indices
     # @pstate:      probability of state occurance
     # @task:        standard or precision measuring (PMT)
-    def __init__(self, episodes=1500, n_pmt=20, learnPMT=False):
+    def __init__(self, episodes=1500, n_pmt=20, learnPMT=False,\
+        delta_1=4, delta_2=2, delta_pmt=1.5):
         
         # states, acitons, and probability of occurance of states
         self.n_states = 12 * 3
@@ -20,16 +21,16 @@ class RangelTask:
         self.q_size  = len(self.actions) + 1     # terminal
 
         # Defining rewards:
-        delta_1 = 4
-        delta_2 = 2
-        self.rewards = [10 + delta_1,  10,  10 - delta_1,
-                        10 + delta_2,  10,  10 - delta_2,
-                        10 + delta_1,  10,  10 - delta_1,
-                        10 + delta_2,  10,  10 - delta_2]
+        self.delta_1 = delta_1
+        self.delta_2 = delta_2
+        self.rewards = [10 + self.delta_1,  10,  10 - self.delta_1,
+                        10 + self.delta_2,  10,  10 - self.delta_2,
+                        10 + self.delta_1,  10,  10 - self.delta_1,
+                        10 + self.delta_2,  10,  10 - self.delta_2]
         # The steps below shouldn't be necessary, but I'm including them
-        delta_pmt = 1.5
-        self.rewards += list(np.array(self.rewards) + delta_pmt) +\
-                        list(np.array(self.rewards) - delta_pmt)    
+        self.delta_pmt = delta_pmt
+        self.rewards += list(np.array(self.rewards) + self.delta_pmt) +\
+                        list(np.array(self.rewards) - self.delta_pmt)    
 
         
         # Experimental design: selecting the sequence of states

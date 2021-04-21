@@ -9,9 +9,11 @@ class DynamicResourceAllocator:
                 lmda=0.1, beta=10, gradient='A', model='dra',\
                 decay=1, nGradUpdates=2, updateFreq=25, \
                 printFreq=50, printUpdates=True, decay1=0.98, \
-                sigmaBase=5, learnPMT=False):
+                sigmaBase=5, learnPMT=False, delta_pmt=1.5, \
+                delta_1=4, delta_2=2):
 
-        self.env            = RangelTask(learnPMT=learnPMT)
+        self.env            = RangelTask(learnPMT=learnPMT, \
+            delta_pmt=delta_pmt, delta_1=delta_1, delta_2=delta_2)
         self.episodes       = episodes
         self.learning_q     = learning_q
         self.learning_sigma = learning_sigma
@@ -51,7 +53,7 @@ class DynamicResourceAllocator:
         self.c          = 0.1     # could be optimized
 
         # Initialising array to record choices
-        self.choicePMT  = np.ones(len(self.env.episodes))
+        self.choicePMT  = np.nan * np.ones(self.env.episodes)
 
 
     def softmax(self, x):
@@ -365,9 +367,10 @@ class DynamicResourceAllocator:
     @property
     def memoryTable(self):
         df = pd.DataFrame( {
-            'action':         self.env.actions, \
-            'q':             np.around(self.q[:-1],1),\
-            'sigma':         np.around(self.sigma[:-1],1) })
+            'state':        np.repeat(np.arange(4),3),\
+            'action':       self.env.actions[:12], \
+            'q':            np.around(self.q[:12],1),\
+            'sigma':        np.around(self.sigma[:12],1) })
         return df
 
 
