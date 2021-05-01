@@ -8,8 +8,8 @@ class RangelTask:
     # @states:      State indices
     # @pstate:      probability of state occurance
     # @task:        standard or precision measuring (PMT)
-    def __init__(self, episodes=1500, n_pmt=20, learnPMT=False,\
-        delta_1=4, delta_2=2, delta_pmt=1.5):
+    def __init__(self, episodes_train=501, episodes_pmt=1002, n_pmt=20,
+        learnPMT=False, delta_1=4, delta_2=2, delta_pmt=1.5):
         
         # states, acitons, and probability of occurance of states
         self.n_states = 12 * 3
@@ -35,17 +35,24 @@ class RangelTask:
         
         # Experimental design: selecting the sequence of states
         self.episode = 0
-        self.episodes = episodes
+        self.episodes_train = episodes_train
+        self.episodes_pmt = episodes_pmt
+        self.episodes = episodes_train + episodes_pmt
         self.learnPMT = learnPMT
         
         # pre-generating the sequence of states
         states = np.append(np.repeat(np.arange(6),4), np.arange(6,12), axis=0)
-        states_training = np.repeat(states, 500/len(states) )
+        
+        states_training = np.repeat(states, self.episodes_train/len(states) )
         np.random.shuffle(states_training)
-        states_PMT = np.repeat(states, (episodes-500)/len(states) )
+        np.random.shuffle(states_training)
+
+        states_PMT = np.repeat(states, (self.episodes_pmt)/len(states) )
         np.random.shuffle(states_PMT)
+        np.random.shuffle(states_PMT)
+
         self.states_pregen = np.append(states_training, states_PMT)
-        self.states_pregen = np.append(states_PMT[:(episodes-len(self.states_pregen))], self.states_pregen)
+        # self.states_pregen = np.append(states_PMT[:(self.episodes-len(self.states_pregen))], self.states_pregen)
         
         # current state and next states
         self.state = self.states_pregen[self.episode]
@@ -53,10 +60,11 @@ class RangelTask:
         
         # setting PMT trial indices and type (+Delta or -Delta)
         self.pmt_trial = np.zeros(len(self.states_pregen))
+        self.n_pmt = n_pmt
 
         for ii in range(12):
             idx_ii = np.where(self.states_pregen == ii)[0]  # get index where state == ii
-            idx_ii = idx_ii[idx_ii>500]                     # throw away training indices
+            idx_ii = idx_ii[idx_ii>self.episodes_train]     # throw away training indices
             np.random.shuffle(idx_ii)                       # shuffle what's left
             idx_i1 = idx_ii[:int(n_pmt/2)]                  # indices for +Delta PMT trials
             idx_i2 = idx_ii[int(n_pmt/2):n_pmt]             # indices for -Delta PMT trials
@@ -70,9 +78,6 @@ class RangelTask:
 
             # for second half: -Delta deterministic option
             self.next_states[idx_i2] = self.states_pregen[idx_i2] + 24
-
-        # set current state
-        self.state = self.reset()
 
 
     def reset(self, newEpisode=False):
@@ -98,14 +103,15 @@ class RangelTask:
             choiceSet = [self.state - 12, self.state]
         elif self.state < 36:
             choiceSet = [self.state - 24, self.state]
+        np.random.shuffle(choiceSet)
         return choiceSet
 
     # point to location in q-table
     def idx(self, state, action):
-        if state >= 12:     # episode terimated
-            idx = -1    
-        else:
-            idx = action
+        # if state >= 12:     # HUGE BUG! INDEX IS ALWAYS ACTION
+        #     idx = -1    
+        # else:
+        idx = action
         return idx
 
     # step in the environment
@@ -117,9 +123,12 @@ class RangelTask:
             info = [False, self.learnPMT]
 
         # next state
-        next_state = self.next_states[self.episode]
-        self.state = next_state
-        self.next_states[self.episode] = None
+        if self.state < 12:
+            next_state = self.next_states[self.episode]
+            self.state = next_state
+        else:
+            next_state = None
+        # self.next_states[self.episode] = None
 
         # reward
         reward = self.rewards[action]

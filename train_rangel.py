@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 from task import RangelTask
 from dra_rangel import DynamicResourceAllocator
+from scipy.stats import norm
 import multiprocessing as mp
 from time import time
 import datetime
@@ -11,8 +12,8 @@ n_restarts  = 5
 lmda        = 0.1
 sigmaBase   = 5
 delta_1     = 4
-delta_2     = 2
-delta_pmt   = 1.5
+delta_2     = 1
+delta_pmt   = 2.5
 learnPMT    = False
 
 # i could define and pass **hyperparams as a dict
@@ -20,8 +21,8 @@ hyperparams = {
     'lmda'      : 0.1,
     'sigmaBase' : 5,
     'delta_1'   : 4,
-    'delta_2'   : 2,
-    'delta_pmt' : 1.5,
+    'delta_2'   : 1,
+    'delta_pmt' : 2.5,
     'learnPMT'  : False }
 
 

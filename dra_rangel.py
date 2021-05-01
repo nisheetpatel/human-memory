@@ -4,17 +4,15 @@ from scipy.optimize import minimize_scalar
 from task import RangelTask
 
 class DynamicResourceAllocator:
-    def __init__(self, episodes=1500, learning_sigma=0.2,\
-                learning_q=0.2, discount=0.95, nTraj=10, \
-                lmda=0.1, beta=10, gradient='A', model='dra',\
-                decay=1, nGradUpdates=2, updateFreq=25, \
-                printFreq=50, printUpdates=True, decay1=0.98, \
-                sigmaBase=5, learnPMT=False, delta_pmt=1.5, \
-                delta_1=4, delta_2=2):
+    def __init__(self, model='dra', lmda=0.1, sigmaBase=5,\
+                learnPMT=False, delta_pmt=2.5, delta_1=4, delta_2=1,\
+                learning_sigma=0.2, learning_q=0.2, discount=0.95,\
+                nTraj=10, beta=10, gradient='A', nGradUpdates=2, \
+                updateFreq=25, decay=1, decay1=0.98,\
+                printFreq=50, printUpdates=True):
 
         self.env            = RangelTask(learnPMT=learnPMT, \
             delta_pmt=delta_pmt, delta_1=delta_1, delta_2=delta_2)
-        self.episodes       = episodes
         self.learning_q     = learning_q
         self.learning_sigma = learning_sigma
         self.discount       = discount
@@ -104,7 +102,7 @@ class DynamicResourceAllocator:
 
             # record choices for PMT trials:
             if self.env.pmt_trial[self.env.episode]:
-                self.choicePMT[self.env.episode] = action
+                    self.choicePMT[self.env.episode] = action
 
             # Get next state and reward
             s1, reward, done, info = self.env.step(action)
@@ -122,9 +120,10 @@ class DynamicResourceAllocator:
 
             if updateQ:
                 # SARSA update for q-value
-                delta = reward + self.discount * self.q[idx1] -\
-                        self.q[idx]
-                self.q[idx] += self.learning_q * delta
+                if idx < 12:    # only update q-values for first 12 states
+                    delta = reward + self.discount * self.q[idx1] -\
+                            self.q[idx]
+                    self.q[idx] += self.learning_q * delta
 
             # Update state and total reward obtained
             state = s1
@@ -132,7 +131,7 @@ class DynamicResourceAllocator:
 
             # Update visits for each idx during episode
             # done for current idx IFF newEp and allocGrad
-            if newEp & allocGrad:
+            if (newEp & allocGrad):
                 self.n_visits[idx] += 1
                 self.n_visits_w = self.decay * self.n_visits_w
                 self.n_visits_w[idx] += 1
@@ -146,15 +145,15 @@ class DynamicResourceAllocator:
         return tot_reward
 
 
-    def computeExpectedReward(self, nEpisodes=500):
+    def computeExpectedReward(self):
         """
         Compute expected reward for current memory distribution.
         """
         rewards = []
         env_currentEp = self.env.episode
-        for ep in range(nEpisodes):
+        for ep in range(self.env.episodes_train):
             self.env.episode = ep
-            rewards.append(self.runEpisode(updateQ=False))
+            rewards.append(self.runEpisode(updateQ=False, newEp=False))
         self.env.episode = env_currentEp
         return np.mean(rewards)
 
@@ -338,7 +337,7 @@ class DynamicResourceAllocator:
         reward_list = []
         ave_reward_list = []
         
-        for ii in range(self.episodes):
+        for ii in range(self.env.episodes):
             # run episode
             rewardObtained = self.runEpisode(newEp=True)
 
@@ -367,7 +366,7 @@ class DynamicResourceAllocator:
     @property
     def memoryTable(self):
         df = pd.DataFrame( {
-            'state':        np.repeat(np.arange(4),3),\
+            'state':        np.repeat(['s1','s2','s3','s4'],3),\
             'action':       self.env.actions[:12], \
             'q':            np.around(self.q[:12],1),\
             'sigma':        np.around(self.sigma[:12],1) })
