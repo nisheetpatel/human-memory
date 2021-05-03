@@ -5,7 +5,7 @@ from task import RangelTask
 
 class DynamicResourceAllocator:
     def __init__(self, model='dra', lmda=0.1, sigmaBase=5,\
-                learnPMT=False, delta_pmt=2.5, delta_1=4, delta_2=1,\
+                learnPMT=False, delta_pmt=2, delta_1=4, delta_2=1,\
                 learning_sigma=0.2, learning_q=0.2, discount=0.95,\
                 nTraj=10, beta=10, gradient='A', nGradUpdates=2, \
                 updateFreq=25, decay=1, decay1=0.98,\
@@ -337,7 +337,7 @@ class DynamicResourceAllocator:
         reward_list = []
         ave_reward_list = []
         
-        for ii in range(self.env.episodes):
+        for ii in range(self.env.episodes-1):
             # run episode
             rewardObtained = self.runEpisode(newEp=True)
 
