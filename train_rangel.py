@@ -93,14 +93,14 @@ def train_model(modelType=None, model=None, lmda=lmda,\
 
 
 
-def save_results(results):
+def save_results(results, lmda=lmda, delta_1=delta_1, delta_2=delta_2, delta_pmt=delta_pmt, learnPMT=learnPMT, sigmaBase=sigmaBase):
 
     # Creating a directory to save the results in
     import os
     import pickle
 
     # define the name of the directory to be created
-    str_append = f'learnPMT{int(learnPMT)}_delta{delta_1}{delta_2}_Delta{delta_pmt}_lmda{lmda}_sigBase{sigmaBase}'
+    str_append = f'delta{delta_1}{delta_2}_learnPMT{int(learnPMT)}_Delta{delta_pmt}_lmda{lmda}_sigBase{sigmaBase}_episodes{results[0].env.episodes}'
 
     savePath = f"./figures/rangelTask/{str_append}/"
 
@@ -141,6 +141,7 @@ def save_results(results):
 if __name__ == '__main__':
     # Defining model types to train
     n_restarts = 5
+    sigmaBase  = 5
     modelTypes = ['dra', 'equalPrecision', 'freq 1']
 
     # # Running in parallel
@@ -161,7 +162,7 @@ if __name__ == '__main__':
                             model = train_model(modelType=modelType, learnPMT=learnPMT, delta_pmt=delta_pmt, delta_1=delta_1, delta_2=delta_2, lmda=lmda)
                             results.append(model)
                     
-                    savePath = save_results(results)
+                    savePath = save_results(results, lmda=lmda, delta_1=delta_1, delta_2=delta_2, delta_pmt=delta_pmt, learnPMT=learnPMT, sigmaBase=sigmaBase)
                     print(f'\n\n Finished training all models for lmda={lmda}, delta=({delta_1},{delta_2}), Delta={delta_pmt}, learnPMT={learnPMT}.\n\n')
 
     # # Retraining after removing stochastic choice sets
