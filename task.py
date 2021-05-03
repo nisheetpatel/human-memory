@@ -8,8 +8,8 @@ class RangelTask:
     # @states:      State indices
     # @pstate:      probability of state occurance
     # @task:        standard or precision measuring (PMT)
-    def __init__(self, episodes_train=501, episodes_pmt=1002, n_pmt=20,
-        learnPMT=False, delta_1=4, delta_2=2, delta_pmt=1.5):
+    def __init__(self, episodes_train=510, episodes_pmt=1020, n_pmt=20,
+        learnPMT=False, delta_1=4, delta_2=1, delta_pmt=2):
         
         # states, acitons, and probability of occurance of states
         self.n_states = 12 * 3
