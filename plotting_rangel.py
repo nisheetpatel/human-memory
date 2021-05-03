@@ -7,7 +7,7 @@ from train_rangel import train_model, save_results
 
 # Training all models and saving results
 # Defining model types to train
-n_restarts = 5
+n_restarts = 10
 modelTypes = ['dra', 'equalPrecision', 'freq 1']
 
 # # Running in parallel
@@ -15,9 +15,9 @@ modelTypes = ['dra', 'equalPrecision', 'freq 1']
 # results = pool.map(train_model, np.repeat(modelTypes, n_restarts))
 
 # Run models in series
-for lmda in [0.1, 0.05, 0.2]:
-    for (delta_1,delta_2) in [(4,2),(4,1)]:
-        for delta_pmt in [1.5, 2.5]:
+for lmda in [0.1]: #, 0.05, 0.2]:
+    for (delta_1,delta_2) in [(4,1)]:
+        for delta_pmt in [2]:
             for learnPMT in [False,True]:
                 
                 results = []
@@ -28,7 +28,7 @@ for lmda in [0.1, 0.05, 0.2]:
                         model = train_model(modelType=modelType, learnPMT=learnPMT, delta_pmt=delta_pmt, delta_1=delta_1, delta_2=delta_2, lmda=lmda)
                         results.append(model)
                 
-                savePath = save_results(results)
+                savePath = save_results(results, lmda=lmda, delta_1=delta_1, delta_2=delta_2, delta_pmt=delta_pmt, learnPMT=learnPMT, sigmaBase=5)
                 print(f'\n\n Finished training all models for lmda={lmda}, delta=({delta_1},{delta_2}), Delta={delta_pmt}, learnPMT={learnPMT}.\n\n')
 
 
@@ -42,19 +42,20 @@ import seaborn as sns
 # Plotting
 # Cycle through directories
 pathlist = Path(f'./figures/rangelTask/').glob('*')
+modelTypes = ['dra', 'equalPrecision', 'freqBased']
 
 for path in pathlist:
     # load models and dfs
     models = pickle.load(open(f'{str(path)}/models','rb'))
     df = pickle.load(open(f'{str(path)}/df','rb'))
 
-    # # plot and save sigmas
-    # sns.lineplot(data=df, x='state', y='sigma', hue='model')
-    # plt.xticks([0, 1, 2, 3], ['s1', 's2', 's3', 's4'])
-    # plt.ylim([1.5, 5.2])
-    # plt.savefig(f'{str(path)}/sigma', format='svg')
-    # plt.savefig(f'{str(path)}/sigma', format='png')
-    # plt.close()
+    # plot and save sigmas
+    sns.lineplot(data=df, x='state', y='sigma', hue='model')
+    plt.xticks([0, 1, 2, 3], ['s1', 's2', 's3', 's4'])
+    plt.ylim([1.5, 5.2])
+    plt.savefig(f'{str(path)}/sigma.svg')
+    plt.savefig(f'{str(path)}/sigma.png')
+    plt.close()
 
     # Compute probability that the model picks deterministic option
     new_models = []
@@ -76,28 +77,28 @@ for path in pathlist:
         model.df_p1 = pd.DataFrame( {
             'state':                np.repeat(['s1','s2','s3','s4'],3),\
             'action':               model.env.actions[:12],
-            'p(choose det. option)':model.p_plusDelta,
+            'p(choose better option)':model.p_plusDelta,
             'type':                 ['model']*12,
             'pmt-type':             ['+']*12 })
 
         model.df_p2 = pd.DataFrame( {
             'state':                np.repeat(['s1','s2','s3','s4'],3),\
             'action':               model.env.actions[:12],
-            'p(choose det. option)':model.p_plusDelta_true,
+            'p(choose better option)':model.p_plusDelta_true,
             'type':                 ['data']*12,
             'pmt-type':             ['+']*12 })
 
         model.df_p3 = pd.DataFrame( {
             'state':                np.repeat(['s1','s2','s3','s4'],3),\
             'action':               model.env.actions[:12],
-            'p(choose det. option)':1-model.p_minusDelta,
+            'p(choose better option)':1-model.p_minusDelta,
             'type':                 ['model']*12,
             'pmt-type':             ['-']*12 })
 
         model.df_p4 = pd.DataFrame( {
             'state':                np.repeat(['s1','s2','s3','s4'],3),\
             'action':               model.env.actions[:12],
-            'p(choose det. option)':1-model.p_minusDelta_true,
+            'p(choose better option)':1-model.p_minusDelta_true,
             'type':                 ['data']*12,
             'pmt-type':             ['-']*12 })
 
@@ -119,7 +120,7 @@ for path in pathlist:
 
     for modelType in modelTypes:
         f,ax=plt.subplots()
-        sns.boxplot(data=df_p[df_p['model']==modelType], x='state', y='p(choose det. option)', hue='type')
+        sns.boxplot(data=df_p[df_p['model']==modelType], x='state', y='p(choose better option)', hue='type')
         plt.title(f'{modelType}')
         plt.savefig(f'{str(path)}/p_choicePMT_{modelType}.svg')
         plt.savefig(f'{str(path)}/p_choicePMT_{modelType}.png')
