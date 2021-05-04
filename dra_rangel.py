@@ -7,7 +7,7 @@ class DynamicResourceAllocator:
     def __init__(self, model='dra', lmda=0.1, sigmaBase=5,\
                 learnPMT=False, delta_pmt=2, delta_1=4, delta_2=1,\
                 learning_sigma=0.2, learning_q=0.2, discount=0.95,\
-                nTraj=10, beta=10, gradient='A', nGradUpdates=2, \
+                nTraj=10, beta=10, gradient='A', nGradUpdates=5, \
                 updateFreq=25, decay=1, decay1=0.98,\
                 printFreq=50, printUpdates=True):
 
@@ -121,8 +121,7 @@ class DynamicResourceAllocator:
             if updateQ:
                 # SARSA update for q-value
                 if idx < 12:    # only update q-values for first 12 states
-                    delta = reward + self.discount * self.q[idx1] -\
-                            self.q[idx]
+                    delta = reward - self.q[idx]    # target is just reward
                     self.q[idx] += self.learning_q * delta
 
             # Update state and total reward obtained
