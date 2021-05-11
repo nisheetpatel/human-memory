@@ -41,17 +41,17 @@ class RangelTask:
         self.learnPMT = learnPMT
         
         # pre-generating the sequence of states
-        states = np.append(np.repeat(np.arange(6),4), np.arange(6,12), axis=0)
+        self.state_distribution = np.append(np.repeat(np.arange(6),4), np.arange(6,12), axis=0)
         
-        states_training = np.repeat(states, self.episodes_train/len(states) )
-        np.random.shuffle(states_training)
-        np.random.shuffle(states_training)
+        self.states_training = np.repeat(self.state_distribution, self.episodes_train/len(self.state_distribution) )
+        np.random.shuffle(self.states_training)
+        np.random.shuffle(self.states_training)
 
-        states_PMT = np.repeat(states, (self.episodes_pmt)/len(states) )
-        np.random.shuffle(states_PMT)
-        np.random.shuffle(states_PMT)
+        self.states_PMT = np.repeat(self.state_distribution, (self.episodes_pmt)/len(self.state_distribution) )
+        np.random.shuffle(self.states_PMT)
+        np.random.shuffle(self.states_PMT)
 
-        self.states_pregen = np.append(states_training, states_PMT)
+        self.states_pregen = np.append(self.states_training, self.states_PMT)
         # self.states_pregen = np.append(states_PMT[:(self.episodes-len(self.states_pregen))], self.states_pregen)
         
         # current state and next states
