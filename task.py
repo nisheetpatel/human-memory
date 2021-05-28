@@ -108,9 +108,6 @@ class RangelTask:
 
     # point to location in q-table
     def idx(self, state, action):
-        # if state >= 12:     # HUGE BUG! INDEX IS ALWAYS ACTION
-        #     idx = -1    
-        # else:
         idx = action
         return idx
 
@@ -132,8 +129,8 @@ class RangelTask:
 
         # reward
         reward = self.rewards[action]
-        if action < 12:
-            reward += np.random.randn()     # stochastic rewards
+        # if action < 12:
+        #     reward += np.random.randn()     # stochastic rewards
 
         # termination
         if next_state is None:  # if regular trial

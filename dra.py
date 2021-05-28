@@ -1,17 +1,19 @@
 import numpy as np
 import pandas as pd
 from scipy.optimize import minimize_scalar
-from task import BottleneckTask
+from task import RangelTask
 
 class DynamicResourceAllocator:
-    def __init__(self, episodes=int(1e4), learning_sigma=0.25,\
-                learning_q=0.2, discount=0.95, nTraj=10, \
-                lmda=1, beta=10, gradient='A', model='dra',\
-                decay=1, nGradUpdates=10, updateFreq=100, \
-                printFreq=100, printUpdates=True, n_stages=2,\
-                noPenaltyForSingleActions=False, decay1=0.98,
-                version=1, sigmaBase=50):
-        self.episodes       = episodes
+    def __init__(self, model='dra', lmda=0.1, sigmaBase=5,\
+                learnPMT=False, delta_pmt=2, delta_1=4, delta_2=1,\
+                learning_sigma=0.2, learning_q=0.2, discount=0.95,\
+                nTraj=10, beta=10, gradient='A', nGradUpdates=5, \
+                updateFreq=1, decay=1, decay1=0.98,\
+                printFreq=50, printUpdates=False):
+
+        np.random.seed()
+        self.env            = RangelTask(learnPMT=learnPMT, \
+            delta_pmt=delta_pmt, delta_1=delta_1, delta_2=delta_2)
         self.learning_q     = learning_q
         self.learning_sigma = learning_sigma
         self.discount       = discount
@@ -19,44 +21,41 @@ class DynamicResourceAllocator:
         self.nTraj          = nTraj
         self.lmda           = lmda
         self.beta           = beta
-        self.env            = BottleneckTask(n_stages=n_stages, version=version)
         self.printFreq      = printFreq
         self.printUpdates   = printUpdates
         self.updateFreq     = updateFreq
         self.nGradUpdates   = nGradUpdates
         self.model          = model
         
-        models = ['dra','equalPrecision','freqBased']
+        models = ['dra','equalPrecision','freq-s','freq-sa','stakes']
         assert model in models, f"Invalid model type. \
                     \n Model must be one of {models}."
 
         # Initialising q-distribution: N(q, diag(sigma)^2)
         self.q  = np.zeros(self.env.q_size)
-        self.sigma0     = 25
+        self.q[:12]     = np.mean(self.env.rewards)
+        self.sigma0     = sigmaBase/2
+        self.sigma_scalar = sigmaBase/2
         self.sigmaBase  = sigmaBase
+        self.sigma_sc_t = np.zeros(self.env.episodes)
         self.sigma      = np.ones(self.q.shape) * self.sigma0
+
+        # Indices to fix: sigma = 0 and q = rewards (known)
+        self.fixed_ids = np.arange(12,len(self.sigma)-1)
+        self.q[self.fixed_ids] = np.array(self.env.rewards)[self.fixed_ids]
+        self.sigma[self.fixed_ids] = 0
+        self.sigma[-1] = 0
 
         # Initialising visit frequency
         self.n_visits   = 1e-5*np.ones(self.sigma.shape)
+        self.n_visits_s = 1e-5*np.ones(self.sigma.shape)
         self.n_visits_w = 1e-5*np.ones(self.sigma.shape)
-        self.n_visits_w1= 1e-5*np.ones(self.sigma.shape)
         self.decay      = decay
         self.decay1     = decay1
-        self.c          = 0.1     # could be optimized
+        self.c          = 0     # could be optimized
 
-        # Indices to fix: sigma = sigmaBase for these
-        self.noPenaltyForSingleActions = \
-            noPenaltyForSingleActions
-
-        if self.noPenaltyForSingleActions:
-            self.fixed_ids = []
-            if n_stages == 2:
-                id_set = [1,3,5,7]
-            elif n_stages == 3:
-                id_set = [1,3,5,7,9,11]
-            for ii in id_set:
-                self.fixed_ids.extend([4*ii + jj \
-                    for jj in range(4)])
+        # Initialising array to record choices
+        self.choicePMT  = np.nan * np.ones(self.env.episodes)
 
 
     def softmax(self, x):
@@ -75,7 +74,7 @@ class DynamicResourceAllocator:
         the choice set available. These are required for resource
         allocation by SGD for DRA.
         """
-        # actions available and pointer for q-table
+        # fetch available actions and pointer for q-table
         actions = self.env.action_space
         idx     = [self.env.idx(state,a) for a in actions]
 
@@ -89,8 +88,31 @@ class DynamicResourceAllocator:
 
         return action, zeta_s, prob_a, actions
 
+
+    def computeNormFactor(self):
+        if self.model == 'equalPrecision':
+            self.normFactor = np.ones(len(self.sigma))
+        
+        elif self.model == 'freq-sa':
+            self.normFactor = (self.c + np.sqrt(self.n_visits_w) )
+        
+        elif self.model == 'freq-s':
+            self.normFactor = (self.c + np.sqrt(self.n_visits_s))
+        
+        elif self.model == 'stakes':
+            self.normFactor = np.zeros(len(self.sigma))
+            self.normFactor[:12] = np.tile( np.repeat(\
+                [self.env.delta_1, self.env.delta_2], 3), 2)
+        else:
+            pass
+        
+        # normalize normFactor for stable target for RA
+        self.normFactor *= 12/np.sum(self.normFactor[:12])
+
+        return
+
     
-    def runEpisode(self, updateQ=True):
+    def runEpisode(self, updateQ=True, newEp=False):
         """
         Run one episode of the task, update the memorized q-values if
         updateQ is True, and return reward obtained in the episode.
@@ -98,19 +120,25 @@ class DynamicResourceAllocator:
         # Initializing some variables
         tot_reward, reward = 0, 0
         done = False
-        state = self.env.reset()
-        idx_list = []
+        state = self.env.reset(newEpisode=newEp)
 
         while not done:
             # Determine next action
-            action, _, _, _ = self.act(state)
-                
+            action, _, _, actions = self.act(state)
+
+            # record choices for PMT trials:
+            if self.env.pmt_trial[self.env.episode]:
+                    self.choicePMT[self.env.episode] = action
+
             # Get next state and reward
-            s1, reward, done, _ = self.env.step(action)
+            s1, reward, done, info = self.env.step(action)
+            updateQ = updateQ * info[0]
+            allocGrad = info[1]
 
             # find pointers to q-table
             idx   = self.env.idx(state,action)
-            idx_list.append(idx)
+            # ids   = [self.env.idx(state,a) for a in actions]
+
             if not done:
                 a1, _, _, _ = self.act(s1)    # next action for sarsa
                 idx1  = self.env.idx(s1,a1)
@@ -119,32 +147,39 @@ class DynamicResourceAllocator:
 
             if updateQ:
                 # SARSA update for q-value
-                delta = reward + self.discount * self.q[idx1] -\
-                        self.q[idx]
-                self.q[idx] += self.learning_q * delta
+                if idx < 12:    # only update q-values for first 12 states
+                    delta = reward - self.q[idx]    # target is just reward
+                    self.q[idx] += self.learning_q * delta
 
             # Update state and total reward obtained
             state = s1
             tot_reward += reward
 
-        # Update visits at the end of the episode
-        if updateQ:
-            self.n_visits[idx_list] += 1
-            self.n_visits_w = self.decay * self.n_visits_w
-            self.n_visits_w[idx_list] += 1
-            self.n_visits_w1= self.decay1 * self.n_visits_w1
-            self.n_visits_w1[idx_list] += 1
+            # Update visits for each idx during episode
+            # done for current idx IFF newEp and allocGrad
+            if (newEp & allocGrad):
+                self.n_visits[idx] += 1
+                self.n_visits_s[actions] += 1   # works only for this task
+                self.n_visits_w = self.decay * self.n_visits_w
+                self.n_visits_w[idx] += 1
+        
+        # reset q-values for terminal state (unnecessary)
+        # q[fixed_ids] should never be updated because updateQ=False
+        self.q[-1] = 0      # terminal state
 
         return tot_reward
 
 
-    def computeExpectedReward(self, nEpisodes=100):
+    def computeExpectedReward(self):
         """
         Compute expected reward for current memory distribution.
         """
         rewards = []
-        for _ in range(nEpisodes):
-            rewards.append(self.runEpisode(updateQ=False))
+        env_currentEp = self.env.episode
+        for ep in range(self.env.episodes_train):
+            self.env.episode = ep
+            rewards.append(self.runEpisode(updateQ=False, newEp=False))
+        self.env.episode = env_currentEp
         return np.mean(rewards)
 
 
@@ -190,21 +225,26 @@ class DynamicResourceAllocator:
         if self.model == 'equalPrecision':
             self.sigma[:] = sigma_scalar
         
-        elif self.model == 'freqBased':
+        elif self.model == 'freq-sa':
             self.sigma = sigma_scalar / \
                 (self.c + np.sqrt(self.n_visits_w))
 
-        # Set terminal states' sigma to sigmaBase
+        # Set terminal states' and fixed_ids sigma to sigmaBase
+        # these are known with certainty and shouldn't cost anything
         self.sigma[-1] = self.sigmaBase
+        self.sigma[self.fixed_ids] = self.sigmaBase
 
         # Set all sigmas greater than sigmaBase to sigmaBase
         self.sigma[self.sigma > self.sigmaBase] = self.sigmaBase
 
-        # No penalty for single actions
-        if self.noPenaltyForSingleActions:
-            self.sigma[self.fixed_ids] = self.sigmaBase
+        # Objective function to return
+        minusObj = self.computeCost() - self.computeExpectedReward()
 
-        return self.computeCost() - self.computeExpectedReward()
+        # Resetting sigma for terminal states and fixed ids to 0
+        self.sigma[-1] = 0
+        self.sigma[self.fixed_ids] = 0
+
+        return minusObj
 
 
     def allocateResources(self):
@@ -234,7 +274,7 @@ class DynamicResourceAllocator:
                 grad  = np.zeros(self.sigma.shape)
                 done = False
                 tot_reward, reward = 0, 0
-                state = self.env.reset()
+                state = self.env.reset()  # newEp=False by default
                 r = []
 
                 while not done:
@@ -242,22 +282,24 @@ class DynamicResourceAllocator:
                     action, z, prob_a, action_space = self.act(state)
                     
                     # Get next state and reward
-                    s1, reward, done, _ = self.env.step(action)
+                    s1, reward, done, info = self.env.step(action)
+                    allocGrad = info[1]
                     r.append(reward)
 
-                    # find pointers to q-table
-                    idx    = self.env.idx(state,action)
-                    id_all = [self.env.idx(state,a) \
-                                for a in action_space]
+                    if allocGrad:
+                        # find pointers to q-table
+                        idx    = self.env.idx(state,action)
+                        id_all = [self.env.idx(state,a) \
+                                    for a in action_space]
 
-                    if self.gradient == 'A':
-                        psi = self.q[idx] - np.mean(self.q[id_all])
-                    elif self.gradient == 'Q':
-                        psi = self.q[idx]
-                    elif self.gradient == 'R':
-                        psi = 1
+                        if self.gradient == 'A':
+                            psi = self.q[idx] - np.mean(self.q[id_all])
+                        elif self.gradient == 'Q':
+                            psi = self.q[idx]
+                        elif self.gradient == 'R':
+                            psi = 1
                     
-                    if self.model == 'dra':
+                        # gradients
                         grad[id_all] -= (self.beta * z * prob_a) * psi
                         grad[idx]    += psi * (self.beta * \
                                 z[np.array(action_space) == action])
@@ -274,6 +316,11 @@ class DynamicResourceAllocator:
                     grads   += [grad]
                     # reward_list.append(tot_reward)
 
+            # Setting fixed and terminal sigmas to sigmaBase to avoid
+            # divide by zero error; reset to 0 at the end of the loop
+            self.sigma[self.fixed_ids] = self.sigmaBase
+            self.sigma[-1] = self.sigmaBase
+            
             # Compute average gradient across sampled trajs & cost
             grad_cost = (self.sigma/(self.sigmaBase**2) - 1/self.sigma)
             grad_mean = np.mean(grads, axis=0)
@@ -282,36 +329,120 @@ class DynamicResourceAllocator:
             self.sigma += self.learning_sigma * \
                             (grad_mean - self.lmda * grad_cost)
 
-            # No penalty for single actions
-            if self.noPenaltyForSingleActions:
-                self.sigma[self.fixed_ids] = self.sigmaBase
-
-        # Gradient-free optimization
+        # Scalar sigma optimization for all other models
         else:
-            # set upper bound for search and normalization
-            if self.model == 'freqBased':
-                norm = (self.c + np.sqrt(self.n_visits_w))
-                ub = np.max(norm) * self.sigmaBase
+            # Gradient-free optimization
+            # # set upper bound for search and normalization
+            # if self.model == 'freqBased':
+            #     norm = (self.c + np.sqrt(self.n_visits_w))
+            #     ub = np.max(norm) * self.sigmaBase
 
-            elif self.model == 'equalPrecision':
-                norm = np.ones(self.sigma.shape)
-                ub = self.sigmaBase
+            # elif self.model == 'equalPrecision':
+            #     norm = np.ones(self.sigma.shape)
+            #     ub = self.sigmaBase
 
-            # Optimize
-            res = minimize_scalar(self.minusObjective,\
-                    method='Bounded', bounds=[0.01,ub])
-            self.sigma = res.x / norm
+            # # Optimize
+            # res = minimize_scalar(self.minusObjective,\
+            #         method='Bounded', bounds=[0.01,ub])
+            # self.sigma = res.x / norm
+                # Gradient-based optimization for DRA
+
+            grads = []
+            self.computeNormFactor()
+            # if self.model == 'equalPrecision':
+            #     self.normFactor = np.ones(len(self.sigma))
+            # elif self.model == 'freqBased':
+            #     self.normFactor = (self.c + np.sqrt(self.n_visits_w/ np.sum(self.n_visits_w)) )
+            #     self.normFactor *= 12/np.sum(self.normFactor)
+            #     # self.normFactor = self.c + np.sqrt(np.repeat([4,1],6))
+
+            for _ in range(int(self.nTraj)):
+                # Initialising some variables
+                grad  = 0
+                done = False
+                tot_reward, reward = 0, 0
+                state = self.env.reset()  # newEp=False by default
+                r = []
+
+                while not done:
+                    # Determine next action
+                    action, z, prob_a, action_space = self.act(state)
+                    
+                    # Get next state and reward
+                    s1, reward, done, info = self.env.step(action)
+                    allocGrad = info[1]
+                    r.append(reward)
+
+                    if allocGrad:
+                        # find pointers to q-table
+                        idx    = self.env.idx(state,action)
+                        id_all = [self.env.idx(state,a) \
+                                    for a in action_space]
+
+                        if self.gradient == 'A':
+                            psi = self.q[idx] - np.mean(self.q[id_all])
+                        elif self.gradient == 'Q':
+                            psi = self.q[idx]
+                        elif self.gradient == 'R':
+                            psi = 1
+                    
+                        # gradients
+                        grad -= psi * (self.beta * \
+                                np.dot(z/self.normFactor[id_all], prob_a))
+                        grad += psi * (self.beta * \
+                                z[np.array(action_space) == action]) / \
+                                self.normFactor[idx]
+
+                    # Update state for next step, add total reward
+                    state       = s1
+                    tot_reward += reward
+                
+                if self.gradient == 'R':
+                    rturn = np.sum(r)
+                    grads += [np.dot(rturn,grad)]
+                else:
+                    # Collect sampled stoch. gradients for all trajs
+                    grads   += [float(grad)]
+                    # reward_list.append(tot_reward)
+
+            # Setting fixed and terminal sigmas to sigmaBase to avoid
+            # divide by zero error; reset to 0 at the end of the loop
+            self.sigma[self.fixed_ids] = self.sigmaBase
+            self.sigma[-1] = self.sigmaBase
+            
+            # Compute average gradient across sampled trajs & cost
+            grad_cost = -12/self.sigma_scalar + self.sigma_scalar/(self.sigmaBase**2) *\
+                        np.sum(np.minimum(1/self.normFactor[:12], self.sigmaBase**2/self.sigma_scalar**2))
+            grad_mean = np.mean(grads, axis=0)
+
+            # Updating sigmas
+            self.sigma_scalar += self.learning_sigma * \
+                                (grad_mean - self.lmda * grad_cost)
+            self.sigma_scalar = np.clip(self.sigma_scalar, 0.5, self.sigmaBase)
+
+            # sigma_scalar can be noisy; so we want a moving average of it
+            self.sigma_sc_t[self.env.episode] = self.sigma_scalar
+
+            if self.env.episode>=25:
+                start = self.env.episode-25
+                end = self.env.episode
+            else:
+                end = self.env.episode
+                start = 0
+                if self.env.episode==0:
+                    end = 1
+
+            self.sigma[:12] = np.mean(self.sigma_sc_t[start:end])/self.normFactor[:12]
         
         # For all models
-        # Set terminal states' sigma to sigmaBase
-        self.sigma[-1] = self.sigmaBase
-
         # Clip sigma to be less than sigmaBase
         self.sigma = np.clip(self.sigma, 0.01, self.sigmaBase)
 
-        # No penalty for single actions: fix to sigmaBase
-        if self.noPenaltyForSingleActions:
-            self.sigma[self.fixed_ids] = self.sigmaBase
+        # Sigmas for fixed ids and terminal states = 0
+        # works because cost function altered to ignore this
+        self.sigma[self.fixed_ids] = 0
+        self.sigma[-1] = 0       
+
 
 
     def train(self):
@@ -319,9 +450,9 @@ class DynamicResourceAllocator:
         reward_list = []
         ave_reward_list = []
         
-        for ii in range(self.episodes):
+        for ii in range(self.env.episodes-1):
             # run episode
-            rewardObtained = self.runEpisode()
+            rewardObtained = self.runEpisode(newEp=True)
 
             # printing updates to indicate training progress
             reward_list.append(rewardObtained)
@@ -339,12 +470,10 @@ class DynamicResourceAllocator:
                     self.allocateResources()
             else:
                 # find optimum every updateFreq episodes
-                if (ii+1) % self.updateFreq == 0:
+                # if (ii+1) % self.updateFreq == 0:
+                #     self.allocateResources()
+                for _ in range(self.nGradUpdates):
                     self.allocateResources()
-                    cost = self.computeCost()
-                    while (cost < 5) | (cost > 18):
-                        self.allocateResources()
-                        cost = self.computeCost()
 
         return
 
@@ -352,24 +481,23 @@ class DynamicResourceAllocator:
     @property
     def memoryTable(self):
         df = pd.DataFrame( {
-            'state':         self.env.transitions[:,0], \
-            'transition':    self.env.transitions[:,1],\
-            'q':             np.around(self.q,1),\
-            'sigma':         np.around(self.sigma,1), \
-            'n visit':   self.n_visits.astype(int),\
-            'n visit w': np.around(self.n_visits_w, 2) })
+            'state':        np.repeat(['s1','s2','s3','s4'],3),\
+            'action':       self.env.actions[:12], \
+            'q':            np.around(self.q[:12],1),\
+            'sigma':        np.around(self.sigma[:12],1) })
         return df
 
 
 # Saving stuff
 if __name__ == '__main__':
-    # Script for plots
+    # basic script
     from dra import DynamicResourceAllocator
     import pandas as pd
     import numpy as np
     import pickle
 
-    model = DynamicResourceAllocator(episodes=1000, printFreq=100)
+    model = DynamicResourceAllocator(model = 'freqBased')
     model.train()
     df = model.memoryTable
-    df.to_pickle(f'./figures/df_{model.model}')
+    print(df)
+    # df.to_pickle(f'./figures/df_{model.model}')
