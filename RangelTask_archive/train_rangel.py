@@ -27,7 +27,7 @@ hyperparams = {
 
 
 # Defining the function to be run in parallel across models
-def train_model(modelType=None, model=None, lmda=lmda,\
+def train_model(modelType='dra', lmda=lmda,\
     sigmaBase=sigmaBase, learnPMT=learnPMT,\
     delta_pmt=delta_pmt, delta_1=delta_1, delta_2=delta_2):
     """
@@ -44,44 +44,19 @@ def train_model(modelType=None, model=None, lmda=lmda,\
     
     # Starting time counter
     start = time()
+
+    # Define the model    
+    model = DynamicResourceAllocator(\
+        model        = modelType,\
+        lmda         = lmda,\
+        sigmaBase    = sigmaBase,\
+        delta_1      = delta_1,\
+        delta_2      = delta_2,\
+        delta_pmt    = delta_pmt,\
+        printUpdates = False,\
+        learnPMT     = learnPMT)
     
-    if (model==None) & (modelType is not None):
-        # Splitting freqBased models into type and decay
-        mType = modelType
-        decay = 1
-
-        if modelType.split()[0] == 'freq':
-            mType = 'freqBased'
-            decay = float(modelType.split()[1])
-
-        model = DynamicResourceAllocator(\
-            model        = mType,\
-            lmda         = lmda,\
-            sigmaBase    = sigmaBase,\
-            delta_1      = delta_1,\
-            delta_2      = delta_2,\
-            delta_pmt    = delta_pmt,\
-            printUpdates = False,\
-            learnPMT     = learnPMT)
-    
-    elif (model != None):
-        if (modelType != None):
-            raise Exception(f'Using model and '\
-                f'ignoring modelType.')
-
-        modelType = model.model
-        if model.model == 'freqBased':
-            if model.decay == 1:
-                model.decay = int(1)
-            modelType = f'freq '+str(model.decay)
-        # model.env.stochastic_choice_sets=False
-
-    elif (model == modelType) & (model == None):
-        raise ValueError(f'Both modelType and '\
-            f'model cannot be None.')
-
     # Train the model
-    # return choices on PMT trials here!
     model.train()
 
     # Printing
@@ -93,16 +68,16 @@ def train_model(modelType=None, model=None, lmda=lmda,\
 
 
 
-def save_results(results, lmda=lmda, delta_1=delta_1, delta_2=delta_2, delta_pmt=delta_pmt, learnPMT=learnPMT, sigmaBase=sigmaBase):
+def save_results(results, lmda=lmda, delta_1=delta_1, delta_2=delta_2, delta_pmt=delta_pmt, learnPMT=learnPMT, sigmaBase=sigmaBase, append_str=''):
 
     # Creating a directory to save the results in
     import os
     import pickle
 
     # define the name of the directory to be created
-    str_append = f'delta{delta_1}{delta_2}_learnPMT{int(learnPMT)}_Delta{delta_pmt}_lmda{lmda}_sigBase{sigmaBase}_episodes{results[0].env.episodes}'
+    folderName = f'delta{delta_1}{delta_2}_learnPMT{int(learnPMT)}_Delta{delta_pmt}_lmda{lmda}_sigBase{sigmaBase}_episodes{results[0].env.episodes}{append_str}'
 
-    savePath = f"./figures/rangelTask/{str_append}/"
+    savePath = f"./figures/rangelTask/{folderName}/"
 
     try:
         os.mkdir(savePath)
@@ -140,33 +115,39 @@ def save_results(results, lmda=lmda, delta_1=delta_1, delta_2=delta_2, delta_pmt
 
 if __name__ == '__main__':
     # Defining model types to train
-    n_restarts = 5
+    n_restarts = 10
     sigmaBase  = 5
-    modelTypes = ['dra', 'equalPrecision', 'freq 1']
+    modelTypes = ['dra', 'freq-sa', 'freq-s', 'stakes', 'equalPrecision']
 
-    # # Running in parallel
-    # pool = mp.Pool()
+    # Running in parallel
+    pool = mp.Pool()
+    lmda = 0.1
+    delta_2 = 1
+    delta_1 = 4
+    delta_pmt = 2
+    learnPMT = False
+    sigmaBase = 5
+    argsToPass = [(modelType, lmda, sigmaBase, learnPMT, delta_pmt, delta_1, delta_2) for modelType in modelTypes*n_restarts]
+
+    results = pool.starmap(train_model, argsToPass)
     # results = pool.map(train_model, np.repeat(modelTypes, n_restarts))
     
-    # Run models in series
-    for lmda in [0.1, 0.05, 0.2]:
-        for (delta_1,delta_2) in [(4,2),(4,1)]:
-            for delta_pmt in [1.5, 2.5]:
-                for learnPMT in [False,True]:
+    # # Run models in series
+    # for lmda in [0.1, 0.05, 0.2]:
+    #     for (delta_1,delta_2) in [(4,2),(4,1)]:
+    #         for delta_pmt in [1.5, 2.5]:
+    #             for learnPMT in [False,True]:
                     
-                    results = []
+    #                 results = []
 
-                    for modelType in modelTypes:
+    #                 for modelType in modelTypes:
                     
-                        for _ in range(n_restarts):
-                            model = train_model(modelType=modelType, learnPMT=learnPMT, delta_pmt=delta_pmt, delta_1=delta_1, delta_2=delta_2, lmda=lmda)
-                            results.append(model)
+    #                     for _ in range(n_restarts):
+    #                         model = train_model(modelType=modelType, learnPMT=learnPMT, delta_pmt=delta_pmt, delta_1=delta_1, delta_2=delta_2, lmda=lmda)
+    #                         results.append(model)
                     
-                    savePath = save_results(results, lmda=lmda, delta_1=delta_1, delta_2=delta_2, delta_pmt=delta_pmt, learnPMT=learnPMT, sigmaBase=sigmaBase)
-                    print(f'\n\n Finished training all models for lmda={lmda}, delta=({delta_1},{delta_2}), Delta={delta_pmt}, learnPMT={learnPMT}.\n\n')
+    #                 savePath = save_results(results, lmda=lmda, delta_1=delta_1, delta_2=delta_2, delta_pmt=delta_pmt, learnPMT=learnPMT, sigmaBase=sigmaBase)
+    #                 print(f'\n\n Finished training all models for lmda={lmda}, delta=({delta_1},{delta_2}), Delta={delta_pmt}, learnPMT={learnPMT}.\n\n')
 
     # # Retraining after removing stochastic choice sets
-    # argsToPass = [(None,model,500) for model in results]
-    # results2 = pool.starmap(train_model, argsToPass)
-
     # savePath = save_results(results2)

@@ -9,8 +9,9 @@ class DynamicResourceAllocator:
                 learning_sigma=0.2, learning_q=0.2, discount=0.95,\
                 nTraj=10, beta=10, gradient='A', nGradUpdates=5, \
                 updateFreq=1, decay=1, decay1=0.98,\
-                printFreq=50, printUpdates=True):
+                printFreq=50, printUpdates=False):
 
+        np.random.seed()
         self.env            = RangelTask(learnPMT=learnPMT, \
             delta_pmt=delta_pmt, delta_1=delta_1, delta_2=delta_2)
         self.learning_q     = learning_q
@@ -26,7 +27,7 @@ class DynamicResourceAllocator:
         self.nGradUpdates   = nGradUpdates
         self.model          = model
         
-        models = ['dra','equalPrecision','freqBased']
+        models = ['dra','equalPrecision','freq-s','freq-sa','stakes']
         assert model in models, f"Invalid model type. \
                     \n Model must be one of {models}."
 
@@ -47,8 +48,8 @@ class DynamicResourceAllocator:
 
         # Initialising visit frequency
         self.n_visits   = 1e-5*np.ones(self.sigma.shape)
+        self.n_visits_s = 1e-5*np.ones(self.sigma.shape)
         self.n_visits_w = 1e-5*np.ones(self.sigma.shape)
-        self.n_visits_w1= 1e-5*np.ones(self.sigma.shape)
         self.decay      = decay
         self.decay1     = decay1
         self.c          = 0     # could be optimized
@@ -87,6 +88,29 @@ class DynamicResourceAllocator:
 
         return action, zeta_s, prob_a, actions
 
+
+    def computeNormFactor(self):
+        if self.model == 'equalPrecision':
+            self.normFactor = np.ones(len(self.sigma))
+        
+        elif self.model == 'freq-sa':
+            self.normFactor = (self.c + np.sqrt(self.n_visits_w) )
+        
+        elif self.model == 'freq-s':
+            self.normFactor = (self.c + np.sqrt(self.n_visits_s))
+        
+        elif self.model == 'stakes':
+            self.normFactor = np.zeros(len(self.sigma))
+            self.normFactor[:12] = np.tile( np.repeat(\
+                [self.env.delta_1, self.env.delta_2], 3), 2)
+        else:
+            pass
+        
+        # normalize normFactor for stable target for RA
+        self.normFactor *= 12/np.sum(self.normFactor[:12])
+
+        return
+
     
     def runEpisode(self, updateQ=True, newEp=False):
         """
@@ -97,11 +121,10 @@ class DynamicResourceAllocator:
         tot_reward, reward = 0, 0
         done = False
         state = self.env.reset(newEpisode=newEp)
-        idx_list = []
 
         while not done:
             # Determine next action
-            action, _, _, _ = self.act(state)
+            action, _, _, actions = self.act(state)
 
             # record choices for PMT trials:
             if self.env.pmt_trial[self.env.episode]:
@@ -114,7 +137,8 @@ class DynamicResourceAllocator:
 
             # find pointers to q-table
             idx   = self.env.idx(state,action)
-            idx_list.append(idx)
+            # ids   = [self.env.idx(state,a) for a in actions]
+
             if not done:
                 a1, _, _, _ = self.act(s1)    # next action for sarsa
                 idx1  = self.env.idx(s1,a1)
@@ -135,10 +159,9 @@ class DynamicResourceAllocator:
             # done for current idx IFF newEp and allocGrad
             if (newEp & allocGrad):
                 self.n_visits[idx] += 1
+                self.n_visits_s[actions] += 1   # works only for this task
                 self.n_visits_w = self.decay * self.n_visits_w
                 self.n_visits_w[idx] += 1
-                self.n_visits_w1= self.decay1 * self.n_visits_w1
-                self.n_visits_w1[idx] += 1
         
         # reset q-values for terminal state (unnecessary)
         # q[fixed_ids] should never be updated because updateQ=False
@@ -202,7 +225,7 @@ class DynamicResourceAllocator:
         if self.model == 'equalPrecision':
             self.sigma[:] = sigma_scalar
         
-        elif self.model == 'freqBased':
+        elif self.model == 'freq-sa':
             self.sigma = sigma_scalar / \
                 (self.c + np.sqrt(self.n_visits_w))
 
@@ -325,13 +348,13 @@ class DynamicResourceAllocator:
                 # Gradient-based optimization for DRA
 
             grads = []
-
-            if self.model == 'equalPrecision':
-                self.normFactor = np.ones(len(self.sigma))
-            elif self.model == 'freqBased':
-                self.normFactor = (self.c + np.sqrt(self.n_visits_w/ np.sum(self.n_visits_w)) )
-                self.normFactor *= 12/np.sum(self.normFactor)
-                # self.normFactor = self.c + np.sqrt(np.repeat([4,1],6))
+            self.computeNormFactor()
+            # if self.model == 'equalPrecision':
+            #     self.normFactor = np.ones(len(self.sigma))
+            # elif self.model == 'freqBased':
+            #     self.normFactor = (self.c + np.sqrt(self.n_visits_w/ np.sum(self.n_visits_w)) )
+            #     self.normFactor *= 12/np.sum(self.normFactor)
+            #     # self.normFactor = self.c + np.sqrt(np.repeat([4,1],6))
 
             for _ in range(int(self.nTraj)):
                 # Initialising some variables
@@ -397,7 +420,7 @@ class DynamicResourceAllocator:
                                 (grad_mean - self.lmda * grad_cost)
             self.sigma_scalar = np.clip(self.sigma_scalar, 0.5, self.sigmaBase)
 
-            # sigma_scalar is extrememly noisy; so we want a moving average of it
+            # sigma_scalar can be noisy; so we want a moving average of it
             self.sigma_sc_t[self.env.episode] = self.sigma_scalar
 
             if self.env.episode>=25:

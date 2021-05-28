@@ -335,6 +335,7 @@ class DynamicResourceAllocator:
                         self.normFactor = np.ones(len(self.sigma))
                     elif self.model == 'freqBased':
                         self.normFactor = (self.c + np.sqrt(self.n_visits_w/ np.sum(self.n_visits_w)) )
+                        self.normFactor *= 12/np.sum(self.normFactor)
                     
                     grad_term1 = z[z_idx, np.arange(len(z_idx))] / self.normFactor[idx]
                     grad_term2 = - np.dot(prob_a, z / self.normFactor[id_all] )
