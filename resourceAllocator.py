@@ -3,7 +3,7 @@ import pandas as pd
 from scipy.optimize import minimize_scalar
 from task import RangelTask
 
-class DynamicResourceAllocator:
+class MemoryResourceAllocator:
     def __init__(self, model='dra', lmda=0.1, sigmaBase=5,\
                 learnPMT=False, delta_pmt=2, delta_1=4, delta_2=1,\
                 learning_sigma=0.2, learning_q=0.2, discount=0.95,\
@@ -139,11 +139,11 @@ class DynamicResourceAllocator:
             idx   = self.env.idx(state,action)
             # ids   = [self.env.idx(state,a) for a in actions]
 
-            if not done:
-                a1, _, _, _ = self.act(s1)    # next action for sarsa
-                idx1  = self.env.idx(s1,a1)
-            else:
-                idx1  = -1
+            # if not done:
+            #     a1, _, _, _ = self.act(s1)    # next action for sarsa
+            #     idx1  = self.env.idx(s1,a1)
+            # else:
+            #     idx1  = -1
 
             if updateQ:
                 # SARSA update for q-value
@@ -349,12 +349,6 @@ class DynamicResourceAllocator:
 
             grads = []
             self.computeNormFactor()
-            # if self.model == 'equalPrecision':
-            #     self.normFactor = np.ones(len(self.sigma))
-            # elif self.model == 'freqBased':
-            #     self.normFactor = (self.c + np.sqrt(self.n_visits_w/ np.sum(self.n_visits_w)) )
-            #     self.normFactor *= 12/np.sum(self.normFactor)
-            #     # self.normFactor = self.c + np.sqrt(np.repeat([4,1],6))
 
             for _ in range(int(self.nTraj)):
                 # Initialising some variables
@@ -444,7 +438,6 @@ class DynamicResourceAllocator:
         self.sigma[-1] = 0       
 
 
-
     def train(self):
         # Initialize variables to track rewards
         reward_list = []
@@ -475,8 +468,6 @@ class DynamicResourceAllocator:
                 for _ in range(self.nGradUpdates):
                     self.allocateResources()
 
-        return
-
 
     @property
     def memoryTable(self):
@@ -490,14 +481,20 @@ class DynamicResourceAllocator:
 
 # Saving stuff
 if __name__ == '__main__':
-    # basic script
-    from dra import DynamicResourceAllocator
-    import pandas as pd
-    import numpy as np
-    import pickle
+    from time import time
+    import datetime as dt
 
-    model = DynamicResourceAllocator(model = 'freqBased')
-    model.train()
-    df = model.memoryTable
-    print(df)
-    # df.to_pickle(f'./figures/df_{model.model}')
+    # Defining models to train
+    modelTypes = ['dra','equalPrecision','freq-s','stakes']
+
+    for modelType in modelTypes:
+        start = time()
+        model = MemoryResourceAllocator(model=modelType)
+
+        print(f'\nTraining model: {modelType}')
+        model.train()
+        timeTaken = str(dt.timedelta(seconds=time()-start) )
+        print(f'Finished training in {timeTaken}')
+        
+        print(f'\nMemory table for model: {modelType}')
+        print(model.memoryTable, '\n')

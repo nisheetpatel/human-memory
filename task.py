@@ -1,7 +1,5 @@
 import numpy as np
-import pandas as pd
 import random
-import scipy.linalg
 
 class RangelTask:
     # @n_states:    Number of states
@@ -129,8 +127,8 @@ class RangelTask:
 
         # reward
         reward = self.rewards[action]
-        # if action < 12:
-        #     reward += np.random.randn()     # stochastic rewards
+        if action < 12:
+            reward += np.random.randn()     # stochastic rewards
 
         # termination
         if next_state is None:  # if regular trial
