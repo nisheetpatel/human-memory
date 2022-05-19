@@ -1,0 +1,13 @@
+# Cache files from python
+__pycache__
+
+# Figure and data folders
+figures/
+data/
+
+# Environment folders
+env/
+venv/
+
+# Python workbench files
+workbench*.py
