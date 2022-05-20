@@ -107,7 +107,7 @@ class Memory2AFC:
         return self.option_choice_set(self._state)
 
     def reward(self, action: Action) -> Reward:
-        option_chosen = self.option_choice_set[action]
+        option_chosen = self.action_space[action]
         reward = self.option_rewards[option_chosen]
 
         # stochastic rewards for the regular options
