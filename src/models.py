@@ -82,14 +82,19 @@ class NoisyQAgent(Agent):
         return action, prob_actions, zeta
 
     def update_values(
-        self, s: State, a: Action, r: Reward, s1: State, prob_a: list
+        self,
+        state: State,
+        action: Action,
+        reward: Reward,
+        next_state: State,
+        prob_actions: list,
     ) -> None:
         # define indices
-        idx_sa = self._index(state=s, action=a)
-        idx_s1 = self._index(state=s1)
+        idx_sa = self._index(state=state, action=action)
+        idx_s1 = self._index(state=next_state)
 
         # compute prediction error
-        target = r + self.gamma * np.max(self.q[idx_s1])
+        target = reward + self.gamma * np.max(self.q[idx_s1])
         prediction = self.q[idx_sa]
         delta = target - prediction
 
