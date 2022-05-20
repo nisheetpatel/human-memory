@@ -4,7 +4,7 @@ from typing import Any
 
 import numpy as np
 
-from customtypes import Action, ActionSpace, Reward, State
+from customtypes import Action, ActionSpace, Experience, Reward, State
 
 
 class Agent(ABC):
@@ -40,7 +40,7 @@ def softargmax(x: np.ndarray, beta: float = 1) -> np.array:
 class NoisyQAgent(Agent):
     name: str
     q_size: tuple[int]
-    sigma_base: float = 1
+    sigma_base: float = 5
     gamma: float = 1
     beta: float = 10
     lmda: float = 0.1
@@ -50,6 +50,10 @@ class NoisyQAgent(Agent):
     def __post_init__(self):
         self.q = np.zeros(self.q_size)
         self.sigma = self.sigma_base * np.ones(self.q_size)
+
+        # visit counters
+        self.action_visit_counts = np.zeros(self.q_size, dtype=int)
+        self.state_visit_counts = np.zeros(self.q_size, dtype=int)
 
     def _index(
         self,
@@ -81,20 +85,13 @@ class NoisyQAgent(Agent):
 
         return action, prob_actions, zeta
 
-    def update_values(
-        self,
-        state: State,
-        action: Action,
-        reward: Reward,
-        next_state: State,
-        prob_actions: list,
-    ) -> None:
+    def update_values(self, e: Experience) -> None:
         # define indices
-        idx_sa = self._index(state=state, action=action)
-        idx_s1 = self._index(state=next_state)
+        idx_sa = self._index(state=e["state"], action=e["action"])
+        idx_s1 = self._index(state=e["next_state"])
 
         # compute prediction error
-        target = reward + self.gamma * np.max(self.q[idx_s1])
+        target = e["reward"] + self.gamma * np.max(self.q[idx_s1])
         prediction = self.q[idx_sa]
         delta = target - prediction
 
@@ -102,3 +99,7 @@ class NoisyQAgent(Agent):
         self.q[idx_sa] += self.lr * delta
 
         return
+
+    def update_visit_counts(self, e: Experience) -> None:
+        self.state_visit_counts[e["state"]] += 1
+        self.action_visit_counts[e["action"]] += 1
