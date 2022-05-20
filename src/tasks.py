@@ -3,13 +3,7 @@ from typing import Protocol, Tuple
 
 import numpy as np
 
-# defining type aliases
-Action = int
-ActionSpace = list[int, int]
-State = int
-Reward = float
-Done = bool
-Info = dict
+from customtypes import Action, ActionSpace, Done, Info, Reward, State
 
 
 class Environment(Protocol):

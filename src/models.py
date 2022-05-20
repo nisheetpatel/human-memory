@@ -4,13 +4,7 @@ from typing import Any
 
 import numpy as np
 
-# defining type aliases
-Action = int
-ActionSpace = list[int, int]
-State = int
-Reward = float
-Done = bool
-Info = dict
+from customtypes import Action, ActionSpace, Reward, State
 
 
 class Agent(ABC):
@@ -44,6 +38,7 @@ def softargmax(x: np.ndarray, beta: float = 1) -> np.array:
 
 @dataclass
 class NoisyQAgent(Agent):
+    name: str
     q_size: tuple[int]
     sigma_base: float = 1
     gamma: float = 1
@@ -67,10 +62,10 @@ class NoisyQAgent(Agent):
             return tuple(state)
         if (action is None) & (action_space is None):
             raise IndexingError("Both action and action space cannot be none.")
-        if action is None:
-            return action_space
         if action is not None:
             return tuple(action)
+        if action_space is not None:
+            return action_space
 
     def act(self, state: State, action_space: ActionSpace):
         # fetching index and defining n_actions
