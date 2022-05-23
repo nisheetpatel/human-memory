@@ -142,25 +142,46 @@ class NoisyQAgent(ABC):
     def norm(self):
         """Define normalizing factor for scalar updates to noise."""
 
-    @abstractmethod
-    def _initialize_grad(self):
-        """Initialize scalar or array-type gradient."""
-
-    @abstractmethod
-    def _update_grad(self, grad, advantage: float, exp: Experience):
-        """Update gradient for the agent"""
-
-    @abstractmethod
-    def _compute_grad_cost(self):
-        """Compute gradient of the cost term for the agent."""
-
-    @abstractmethod
-    def _update_noise(self, delta):
-        """Update agent's noise vector."""
-
     def _compute_advantage(self, exp: Experience) -> float:
         idx_s, _, idx_sa = self._compute_indices(exp)
         return self.q[idx_sa] - np.dot(self.q[idx_s], exp["prob_actions"])
+
+    def _initialize_grad(self):
+        """Initialize scalar gradient by default."""
+        return 0
+
+    def _update_grad(self, grad, advantage: float, exp: Experience):
+        """Update scalar gradient for the agent"""
+        idx_s, _, idx_sa = self._compute_indices(exp)
+        grad -= advantage * (
+            self.p.beta * np.dot(exp["zeta"] / self.norm[idx_s], exp["prob_actions"])
+        )
+        grad += (
+            advantage
+            * (self.p.beta * exp["zeta"][exp["action_idx"]])
+            / self.norm[idx_sa]
+        )
+        return grad
+
+    def _compute_grad_cost(self):
+        """Compute scalar gradient of the cost term for the agent."""
+        grad_cost = -12 / self.sigma_scalar + self.sigma_scalar / (
+            self.p.sigma_base**2
+        ) * np.sum(
+            np.minimum(
+                1 / self.norm[:12], self.p.sigma_base**2 / self.sigma_scalar**2
+            )
+        )
+        return grad_cost
+
+    def _update_noise(self, delta):
+        """Update agent's noise vector."""
+        self.sigma_scalar += self.p.lr * delta
+        self.sigma_history.append(self.sigma_scalar)
+
+        # sigma_scalar can be noisy; so we update with its moving average
+        self.sigma[:12] = np.mean(self.sigma_history[-25:]) / self.norm[:12]
+        return
 
     def allocate_memory_resources(self):
         """Update agent's noise (sigma) parameters."""
@@ -223,39 +244,6 @@ class FreqRA(NoisyQAgent):
         norm_factor = np.sqrt(self.state_visit_counts)
         return 12 * norm_factor / np.sum(norm_factor[:12])
 
-    def _initialize_grad(self):
-        return 0
-
-    def _update_grad(self, grad, advantage: float, exp: Experience):
-        idx_s, _, idx_sa = self._compute_indices(exp)
-        grad -= advantage * (
-            self.p.beta * np.dot(exp["zeta"] / self.norm[idx_s], exp["prob_actions"])
-        )
-        grad += (
-            advantage
-            * (self.p.beta * exp["zeta"][exp["action_idx"]])
-            / self.norm[idx_sa]
-        )
-        return grad
-
-    def _compute_grad_cost(self):
-        grad_cost = -12 / self.sigma_scalar + self.sigma_scalar / (
-            self.p.sigma_base**2
-        ) * np.sum(
-            np.minimum(
-                1 / self.norm[:12], self.p.sigma_base**2 / self.sigma_scalar**2
-            )
-        )
-        return grad_cost
-
-    def _update_noise(self, delta):
-        self.sigma_scalar += self.p.lr * delta
-        self.sigma_history.append(self.sigma_scalar)
-
-        # sigma_scalar can be noisy; so we update with its moving average
-        self.sigma[:12] = np.mean(self.sigma_history[-25:]) / self.norm[:12]
-        return
-
 
 @dataclass
 class StakesRA(NoisyQAgent):
@@ -269,39 +257,6 @@ class StakesRA(NoisyQAgent):
         norm_factor[:12] = np.tile(np.repeat([4, 1], 3), 2)
         return 12 * norm_factor / np.sum(norm_factor[:12])
 
-    def _initialize_grad(self):
-        return 0
-
-    def _update_grad(self, grad, advantage: float, exp: Experience):
-        idx_s, _, idx_sa = self._compute_indices(exp)
-        grad -= advantage * (
-            self.p.beta * np.dot(exp["zeta"] / self.norm[idx_s], exp["prob_actions"])
-        )
-        grad += (
-            advantage
-            * (self.p.beta * exp["zeta"][exp["action_idx"]])
-            / self.norm[idx_sa]
-        )
-        return grad
-
-    def _compute_grad_cost(self):
-        grad_cost = -12 / self.sigma_scalar + self.sigma_scalar / (
-            self.p.sigma_base**2
-        ) * np.sum(
-            np.minimum(
-                1 / self.norm[:12], self.p.sigma_base**2 / self.sigma_scalar**2
-            )
-        )
-        return grad_cost
-
-    def _update_noise(self, delta):
-        self.sigma_scalar += self.p.lr * delta
-        self.sigma_history.append(self.sigma_scalar)
-
-        # sigma_scalar can be noisy; so we update with its moving average
-        self.sigma[:12] = np.mean(self.sigma_history[-25:]) / self.norm[:12]
-        return
-
 
 @dataclass
 class EqualRA(NoisyQAgent):
@@ -313,36 +268,3 @@ class EqualRA(NoisyQAgent):
     def norm(self):
         norm_factor = np.ones(len(self.sigma))
         return 12 * norm_factor / np.sum(norm_factor[:12])
-
-    def _initialize_grad(self):
-        return 0
-
-    def _update_grad(self, grad, advantage: float, exp: Experience):
-        idx_s, _, idx_sa = self._compute_indices(exp)
-        grad -= advantage * (
-            self.p.beta * np.dot(exp["zeta"] / self.norm[idx_s], exp["prob_actions"])
-        )
-        grad += (
-            advantage
-            * (self.p.beta * exp["zeta"][exp["action_idx"]])
-            / self.norm[idx_sa]
-        )
-        return grad
-
-    def _compute_grad_cost(self):
-        grad_cost = -12 / self.sigma_scalar + self.sigma_scalar / (
-            self.p.sigma_base**2
-        ) * np.sum(
-            np.minimum(
-                1 / self.norm[:12], self.p.sigma_base**2 / self.sigma_scalar**2
-            )
-        )
-        return grad_cost
-
-    def _update_noise(self, delta):
-        self.sigma_scalar += self.p.lr * delta
-        self.sigma_history.append(self.sigma_scalar)
-
-        # sigma_scalar can be noisy; so we update with its moving average
-        self.sigma[:12] = np.mean(self.sigma_history[-25:]) / self.norm[:12]
-        return
