@@ -110,7 +110,7 @@ class NoisyQAgent(ABC):
 
         return action, prob_actions, zeta
 
-    def record(self, exp: Experience) -> None:
+    def observe(self, exp: Experience) -> None:
         self.exp_buffer += [exp]
 
     def _compute_indices(self, exp: Experience):
