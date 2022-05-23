@@ -45,17 +45,16 @@ class Simulator:
 
         while not done:
             experience, done = act_and_step(self.agent, self.env, state)
-
+            self.agent.observe(experience)
             self.agent.update_values(experience)
             self.agent.update_visit_counts(experience)
-            self.agent.record(experience)
 
             # Update state and total reward obtained
             state = experience["next_state"]
             tot_reward += experience["reward"]
 
         # allocate resources
-        self.update_agent_noise()
+        self.agent.allocate_memory_resources()
 
         return tot_reward
 
