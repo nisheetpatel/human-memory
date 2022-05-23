@@ -1,3 +1,4 @@
+from enum import Enum
 from typing import TypedDict
 
 # custom type aliases
@@ -7,6 +8,13 @@ State = int
 Reward = float
 Done = bool
 Info = dict
+
+
+class ModelName(Enum):
+    DRA = "DRA"
+    FREQ = "Frequency"
+    STAKES = "Stakes"
+    EQUALPRECISION = "Equal-Precision"
 
 
 class Experience(TypedDict):
