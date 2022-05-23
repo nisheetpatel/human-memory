@@ -23,4 +23,5 @@ class Experience(TypedDict):
     reward: Reward
     next_state: State
     zeta: list[float]
+    action_idx: int
     prob_actions: list[float]
