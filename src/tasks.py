@@ -22,13 +22,14 @@ class Environment(Protocol):
 
 
 class FinalEpisodeError(Exception):
-    ...
+    error: str
 
 
 @dataclass
 class Memory2AFC:
     """
-    2AFC task with 12 options, grouped into 4 sets of 3 options each.
+    2AFC (2 alternative forced-choice) task with 12 options,
+        grouped into 4 sets of 3 options each.
     On each trial, one of the four sets is selected with probability
     p(set), and two options are drawn from it uniformly at random.
     Trials are pre-generated and proceed in sequence.
@@ -167,7 +168,7 @@ class Memory2AFC:
         """Update state to the next one (pre-generated)."""
 
         if not self.is_task_finished():
-            raise FinalEpisodeError()
+            raise FinalEpisodeError("Go home. No more trials left!")
 
         self._state = self._episode_list[self._episode]
 
