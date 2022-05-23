@@ -24,4 +24,8 @@ class Experience(TypedDict):
     next_state: State
     zeta: list[float]
     action_idx: int
+    action_space: ActionSpace
     prob_actions: list[float]
+
+
+ExperienceBuffer = list[Experience]
