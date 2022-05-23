@@ -7,11 +7,6 @@ from models import Agent, NoisyQAgent
 from tasks import Environment
 
 
-class DataHandler:
-    def record(self, experience: Experience):
-        pass
-
-
 def act_and_step(
     agent: Agent, env: Environment, state: State
 ) -> tuple[Experience, Done]:
@@ -30,6 +25,7 @@ def act_and_step(
         "next_state": next_state,
         "zeta": zeta,
         "action_idx": (np.array(env.action_space) == action),
+        "action_space": env.action_space,
         "prob_actions": prob_actions,
     }
 
@@ -40,9 +36,8 @@ def act_and_step(
 class Simulator:
     agent: NoisyQAgent
     env: Environment
-    data: DataHandler
 
-    def run_episode(self, updates: bool = True) -> Reward:
+    def run_episode(self) -> Reward:
         # Initializing some variables
         tot_reward, reward = 0, 0
         done = False
@@ -51,10 +46,9 @@ class Simulator:
         while not done:
             experience, done = act_and_step(self.agent, self.env, state)
 
-            if updates:
-                self.agent.update_values(experience)
-                self.agent.update_visit_counts(experience)
-                self.data.record(experience)
+            self.agent.update_values(experience)
+            self.agent.update_visit_counts(experience)
+            self.agent.record(experience)
 
             # Update state and total reward obtained
             state = experience["next_state"]
