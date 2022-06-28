@@ -1,4 +1,4 @@
-from abc import ABC, abstractmethod, abstractproperty
+from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Callable, List
 
@@ -35,20 +35,18 @@ class Agent(ABC):
     @abstractmethod
     def act(self, state: State, action_space: ActionSpace) -> Action:
         """Select an action."""
-        pass
 
     @abstractmethod
-    def update_values(self, e: Experience) -> None:
-        pass
+    def update_values(self, experience: Experience) -> None:
+        """Update agent's values based on experience."""
 
     @abstractmethod
     def observe(self, obs: State, reward: Reward, done: Done, info: Info) -> None:
         """Observe consequences of last action and cache them in ExperienceBuffer."""
-        pass
 
     @abstractmethod
-    def update_visit_counts(self, e: Experience) -> None:
-        pass
+    def update_visit_counts(self, experience: Experience) -> None:
+        """Update agent's visit counts based on experience."""
 
 
 def softargmax(x: np.ndarray, beta: float = 1) -> np.ndarray:
@@ -66,7 +64,7 @@ class IndexingError(Exception):
 
 def indexer_2afc(
     state: State = None, action: Action = None, action_space: ActionSpace = None
-) -> int:
+):
     """Returns q-table index entry for the Memory 2AFC task."""
     if state == -1:
         return state
@@ -76,6 +74,7 @@ def indexer_2afc(
         return action
     if action_space is not None:
         return action_space
+    raise IndexingError("Fatal: no cases match for indexer.")
 
 
 @dataclass
@@ -88,6 +87,8 @@ class NoisyQAgent(ABC):
     def __post_init__(self):
         self.q = np.zeros(self.q_size)
         self.sigma = self.p.sigma_base * np.ones(self.q_size)
+        self.sigma_scalar = 1
+        self.sigma_history = []
 
         # visit counters
         self.action_visit_counts = np.zeros(self.q_size, dtype=int)
@@ -110,22 +111,24 @@ class NoisyQAgent(ABC):
 
         return action, prob_actions, zeta
 
-    def observe(self, exp: Experience) -> None:
-        self.exp_buffer += [exp]
+    def observe(self, experience: Experience) -> None:
+        self.exp_buffer += [experience]
 
-    def _compute_indices(self, exp: Experience):
+    def _compute_indices(self, experience: Experience):
         """Compute all indices for possible operations."""
-        idx_s = self._index(state=exp["state"], action_space=exp["action_space"])
-        idx_s1 = self._index(state=exp["next_state"])
-        idx_sa = self._index(state=exp["state"], action=exp["action"])
+        idx_s = self._index(
+            state=experience["state"], action_space=experience["action_space"]
+        )
+        idx_s1 = self._index(state=experience["next_state"])
+        idx_sa = self._index(state=experience["state"], action=experience["action"])
         return idx_s, idx_s1, idx_sa
 
-    def update_values(self, e: Experience) -> None:
+    def update_values(self, experience: Experience) -> None:
         # compute relevant indices
-        _, idx_s1, idx_sa = self._compute_indices(e)
+        _, idx_s1, idx_sa = self._compute_indices(experience)
 
         # compute prediction error
-        target = e["reward"] + self.p.gamma * np.max(self.q[idx_s1])
+        target = experience["reward"] + self.p.gamma * np.max(self.q[idx_s1])
         prediction = self.q[idx_sa]
         delta = target - prediction
 
@@ -134,31 +137,33 @@ class NoisyQAgent(ABC):
 
         return
 
-    def update_visit_counts(self, e: Experience) -> None:
-        self.state_visit_counts[e["state"]] += 1
-        self.action_visit_counts[e["action"]] += 1
+    def update_visit_counts(self, experience: Experience) -> None:
+        self.state_visit_counts[experience["state"]] += 1
+        self.action_visit_counts[experience["action"]] += 1
 
-    @abstractproperty
+    @property
+    @abstractmethod
     def norm(self):
         """Define normalizing factor for scalar updates to noise."""
 
-    def _compute_advantage(self, exp: Experience) -> float:
-        idx_s, _, idx_sa = self._compute_indices(exp)
-        return self.q[idx_sa] - np.dot(self.q[idx_s], exp["prob_actions"])
+    def _compute_advantage(self, experience: Experience) -> float:
+        idx_s, _, idx_sa = self._compute_indices(experience)
+        return self.q[idx_sa] - np.dot(self.q[idx_s], experience["prob_actions"])
 
     def _initialize_grad(self):
         """Initialize scalar gradient by default."""
         return 0
 
-    def _update_grad(self, grad, advantage: float, exp: Experience):
+    def _update_grad(self, grad, advantage: float, experience: Experience):
         """Update scalar gradient for the agent"""
-        idx_s, _, idx_sa = self._compute_indices(exp)
+        idx_s, _, idx_sa = self._compute_indices(experience)
         grad -= advantage * (
-            self.p.beta * np.dot(exp["zeta"] / self.norm[idx_s], exp["prob_actions"])
+            self.p.beta
+            * np.dot(experience["zeta"] / self.norm[idx_s], experience["prob_actions"])
         )
         grad += (
             advantage
-            * (self.p.beta * exp["zeta"][exp["action_idx"]])
+            * (self.p.beta * experience["zeta"][experience["action_idx"]])
             / self.norm[idx_sa]
         )
         return grad
@@ -187,9 +192,9 @@ class NoisyQAgent(ABC):
         """Update agent's noise (sigma) parameters."""
         grads = []
 
-        for exp in self.exp_buffer[-self.p.n_trajectories :]:
-            psi = self._compute_advantage(exp)
-            grads += [self._update_grad(self._initialize_grad(), psi, exp)]
+        for experience in self.exp_buffer[-self.p.n_trajectories :]:
+            psi = self._compute_advantage(experience)
+            grads += [self._update_grad(self._initialize_grad(), psi, experience)]
 
         # Setting fixed and terminal sigmas to sigma_base to avoid
         # divide by zero error; reset to 0 at the end of the loop
@@ -220,10 +225,14 @@ class DRA(NoisyQAgent):
     def _initialize_grad(self):
         return np.zeros(self.sigma.shape)
 
-    def _update_grad(self, grad, advantage: float, exp: Experience):
-        idx_s, _, idx_sa = self._compute_indices(exp)
-        grad[idx_s] -= advantage * self.p.beta * exp["zeta"] * exp["prob_actions"]
-        grad[idx_sa] += advantage * self.p.beta * exp["zeta"][exp["action"]]
+    def _update_grad(self, grad, advantage: float, experience: Experience):
+        idx_s, _, idx_sa = self._compute_indices(experience)
+        grad[idx_s] -= (
+            advantage * self.p.beta * experience["zeta"] * experience["prob_actions"]
+        )
+        grad[idx_sa] += (
+            advantage * self.p.beta * experience["zeta"][experience["action"]]
+        )
         return grad
 
     def _compute_grad_cost(self):
@@ -268,3 +277,7 @@ class EqualRA(NoisyQAgent):
     def norm(self):
         norm_factor = np.ones(len(self.sigma))
         return 12 * norm_factor / np.sum(norm_factor[:12])
+
+
+if __name__ == "__main__":
+    print("This file is not meant to be run as a script.")
