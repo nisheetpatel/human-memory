@@ -63,14 +63,14 @@ def plot_summary_stats(
     plt.close()
 
     # subjects delta_pmt values
-    f = sns.violinplot(
+    fig = sns.violinplot(
         x="Subject ID",
         y="delta",
         data=df,
     )
-    f.set_xlabel("")
-    f.set_ylabel("$\Delta_{PMT}$")
-    f.set_title("Final $\Delta_{PMT}$ values for all subjects")
+    fig.set_xlabel("")
+    fig.set_ylabel("$\Delta_{PMT}$")
+    fig.set_title("Final $\Delta_{PMT}$ values for all subjects")
     table = plt.table(
         cellText=[list(df["delta"].unique().astype(str))],
         colLabels=[""] * 5,
