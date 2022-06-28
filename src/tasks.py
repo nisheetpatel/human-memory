@@ -8,15 +8,15 @@ from customtypes import Action, ActionSpace, Done, Info, Reward, State
 
 class Environment(Protocol):
     @property
-    def action_space() -> ActionSpace:
+    def action_space(self) -> ActionSpace:
         """List available actions."""
         ...
 
-    def reset() -> State:
+    def reset(self) -> State:
         """Reset environment state for the new episode."""
         ...
 
-    def step() -> Tuple[State, Reward, Done, Info]:
+    def step(self, action: Action) -> Tuple[State, Reward, Done, Info]:
         """Step in the environment."""
         ...
 
@@ -35,6 +35,7 @@ class Memory2AFC:
     Trials are pre-generated and proceed in sequence.
     """
 
+    _state: int = 0
     n_states: int = 37
     n_actions: int = 2
     delta_1: float = 4
