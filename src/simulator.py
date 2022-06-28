@@ -39,7 +39,7 @@ class Simulator:
 
     def run_episode(self) -> Reward:
         # Initializing some variables
-        tot_reward, reward = 0, 0
+        tot_reward = 0
         done = False
         state = self.env.reset()
 
@@ -58,64 +58,64 @@ class Simulator:
 
         return tot_reward
 
-    def update_agent_noise(self):
-        """Generate trajectories on policy."""
+    # def update_agent_noise(self):
+    #     """Generate trajectories on policy."""
 
-        grads = []
+    #     grads = []
 
-        for _ in range(self.agent.p.n_trajectories):
-            # Initializing some variables
-            grad = np.zeros(self.agent.sigma.shape)
-            tot_reward, reward = 0, 0
-            done = False
-            state = self.env.reset()
-            r = []
+    #     for _ in range(self.agent.p.n_trajectories):
+    #         # Initializing some variables
+    #         grad = np.zeros(self.agent.sigma.shape)
+    #         tot_reward, reward = 0, 0
+    #         done = False
+    #         state = self.env.reset()
+    #         r = []
 
-            while not done:
+    #         while not done:
 
-                exp, done = act_and_step(self.agent, self.env, state)
-                r.append(exp["reward"])
+    #             exp, done = act_and_step(self.agent, self.env, state)
+    #             r.append(exp["reward"])
 
-                idx_sa = self.agent._index(state=state, action=exp["action"])
-                idx_s = self.agent._index(
-                    state=state, action_space=self.env.action_space
-                )
+    #             idx_sa = self.agent._index(state=state, action=exp["action"])
+    #             idx_s = self.agent._index(
+    #                 state=state, action_space=self.env.action_space
+    #             )
 
-                # advantage function
-                psi = self.agent.q[idx_sa] - np.dot(
-                    self.agent.q[idx_s], exp["prob_actions"]
-                )
+    #             # advantage function
+    #             psi = self.agent.q[idx_sa] - np.dot(
+    #                 self.agent.q[idx_s], exp["prob_actions"]
+    #             )
 
-                # gradients
-                grad[idx_s] -= psi * (
-                    self.agent.p.beta * exp["zeta"] * exp["prob_actions"]
-                )
-                grad[idx_sa] += psi * self.agent.p.beta * exp["zeta"][exp["action"]]
+    #             # gradients
+    #             grad[idx_s] -= psi * (
+    #                 self.agent.p.beta * exp["zeta"] * exp["prob_actions"]
+    #             )
+    #             grad[idx_sa] += psi * self.agent.p.beta * exp["zeta"][exp["action"]]
 
-                # Update state and total reward obtained
-                state = exp["next_state"]
-                tot_reward += reward
+    #             # Update state and total reward obtained
+    #             state = exp["next_state"]
+    #             tot_reward += reward
 
-            # collect sampled stoch. gradients for all trajectories
-            grads += [grad]
+    #         # collect sampled stoch. gradients for all trajectories
+    #         grads += [grad]
 
-        # Setting fixed and terminal sigmas to sigma_base to avoid
-        # divide by zero error; reset to 0 at the end of the loop
-        self.agent.sigma[12:] = self.agent.p.sigma_base
+    #     # Setting fixed and terminal sigmas to sigma_base to avoid
+    #     # divide by zero error; reset to 0 at the end of the loop
+    #     self.agent.sigma[12:] = self.agent.p.sigma_base
 
-        # Compute average gradient across sampled trajs & cost
-        grad_cost = (
-            self.agent.sigma / (self.agent.p.sigma_base**2) - 1 / self.agent.sigma
-        )
-        grad_mean = np.mean(grads, axis=0)
+    #     # Compute average gradient across sampled trajs & cost
+    #     grad_cost = (
+    #         self.agent.sigma / (self.agent.p.sigma_base**2) - 1 / self.agent.sigma
+    #     )
+    #     grad_mean = np.mean(grads, axis=0)
 
-        # Updating sigmas
-        self.agent.sigma += self.agent.p.lr * (
-            grad_mean - self.agent.p.lmda * grad_cost
-        )
+    #     # Updating sigmas
+    #     self.agent.sigma += self.agent.p.lr * (
+    #         grad_mean - self.agent.p.lmda * grad_cost
+    #     )
 
-        # reset the original state
-        self.env._episode -= self.agent.p.n_trajectories
-        self.agent.sigma[12:] = 0
+    #     # reset the original state
+    #     self.env._episode -= self.agent.p.n_trajectories
+    #     self.agent.sigma[12:] = 0
 
-        return
+    #     return
