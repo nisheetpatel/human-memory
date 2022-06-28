@@ -179,7 +179,7 @@ class Memory2AFC:
         """Step in the environment."""
 
         if not self.is_task_finished():
-            print(f"Ignoring step calls beyond what the environment allows.")
+            print("Ignoring step calls beyond what the environment allows.")
 
         # next state, reward, termination
         next_state = -1
