@@ -1,6 +1,7 @@
 # data files
 pilot*data/
-data/
+simulatedData/
+*.log
 
 # figures and plots
 figures/
@@ -10,14 +11,8 @@ Plots/
 archive/
 
 # libraries, vscode settings
-etc/
 .vscode
-bin/
-lib64/
-lib/
 pyvenv.cfg
-include/
-share/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

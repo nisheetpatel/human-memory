@@ -10,26 +10,30 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 
-# Define the train function outside the class
+# Define the train function outside the class 
+# so that models can be trained in parallel w multiprocessing
 def train(model):
 	model.train()
 	return model
 
 class Experiment:
-	def __init__(self, lmda=0.1, sigmaBase=5, learnPMT=False, delta_pmt=2, 
+	def __init__(self, lmda=0.1, sigmaBase=5, learnPMT=False, delta_pmt=4, 
 				delta_1=4, delta_2=1, varySubjectParams=False,
-				nSubjectsPerModel=10, printUpdates=False) -> None:
+				nSubjectsPerModel=10, printUpdates=False, adaptDelta=False,
+				stepSize_adaptDelta=1, nTrials_adaptDelta=20) -> None:
 
 		# Initialize variables
 		self.models = []
 		self.modelTypes = ['dra', 'freq-s', 'stakes', 'equalPrecision']
 		nModels = nSubjectsPerModel * len(self.modelTypes)
 		self.printUpdates = printUpdates
+		self.stepSize_adaptDelta = stepSize_adaptDelta
+		self.nTrials_adaptDelta  = nTrials_adaptDelta
 
 		# set models' internal params (subject params)
 		if varySubjectParams:
-			lmdas = np.random.lognormal(np.log(lmda), np.log(10)/4, nModels)
-			sigmaBases = np.random.lognormal(np.log(sigmaBase), np.log(10)/4, nModels)
+			lmdas = np.random.lognormal(np.log(lmda), np.log(10)/8, nModels)
+			sigmaBases = np.random.lognormal(np.log(sigmaBase), np.log(10)/8, nModels)
 		else:
 			lmdas = [lmda] * nModels
 			sigmaBases = [sigmaBase] * nModels
@@ -39,14 +43,17 @@ class Experiment:
 		# define models
 		for (modelType, lmda, sigmaBase) in self.subjectParams:
 			model = MemoryResourceAllocator(\
-				model        = modelType,\
-				lmda         = lmda,\
-				sigmaBase    = sigmaBase,\
-				delta_1      = delta_1,\
-				delta_2      = delta_2,\
-				delta_pmt    = delta_pmt,\
-				printUpdates = False,\
-				learnPMT     = learnPMT)
+				model        = modelType,
+				lmda         = lmda,
+				sigmaBase    = sigmaBase,
+				delta_1      = delta_1,
+				delta_2      = delta_2,
+				delta_pmt    = delta_pmt,
+				printUpdates = False,
+				learnPMT     = learnPMT,
+				adaptDelta   = adaptDelta,
+				stepSize_adaptDelta = stepSize_adaptDelta,
+				nTrials_adaptDelta  = nTrials_adaptDelta)
 			self.models.append(model)
 
 
@@ -114,6 +121,72 @@ class Experiment:
 
 		# update models in experiment
 		self.models = new_models
+
+
+	# gather choice data
+	def gatherChoiceData(self, subject_id=0):
+		
+		df_list = []
+
+		# start counting subjects
+		subject_id = subject_id
+
+		for model in self.models:
+
+			ids = ~np.isnan(model.choicePMT)
+			l = len(model.choicePMT[ids])
+
+			# initializing state columns
+			states = (model.env.states_pregen % 12) // 3
+
+			# one-hot states
+			X = np.zeros((states.size, 4))
+			X[np.arange(states.size),states] = 1
+
+			# converting state labels: 0-3 --> s1-s4
+			states_dict = {0:'s1', 1:'s2', 2:'s3', 3:'s4'}
+			states = np.array([states_dict[state] for state in states])
+
+			# outcome (in/correct) (y) column
+			y = np.nan * np.ones(len(model.choicePMT))
+
+			y[model.env.pmt_trial==1] = model.choicePMT[model.env.pmt_trial==1].copy()//12
+			y[model.env.pmt_trial==-1]= 1 - (model.choicePMT[model.env.pmt_trial==-1].copy()//12)/2
+
+			# extracting PMT trials
+			states  = states[ids]
+			X       = X[ids].astype(int)
+			y       = y[ids].astype(int)
+
+			# dataframe for model
+			df_model = pd.DataFrame({
+					'subject-id':   [subject_id] * l,
+					'model-type':   [model.model] * l,
+					'lmda':         [model.lmda] * l,
+					'sigmaBase':    [model.sigmaBase] * l,
+					'delta_pmt':    [model.env.delta_pmt] * l,
+					'state':        states,
+					'x1':           X[:,0],
+					'x2':           X[:,1],
+					'x3':           X[:,2],
+					'x4':           X[:,3],
+					'y':            y
+				})
+			
+			# discard data from trials when delta is still being adapted
+			if model.adaptDelta:
+				df_model = df_model[model.nTrials_adaptD:]
+			
+			# add this to the list of dataframes
+			df_list += [df_model]
+
+			# increase counter for next subject (here: model)
+			subject_id += 1
+
+		# concatenate dataframes for all models
+		df = pd.concat(df_list, ignore_index=True, sort=False)
+
+		return df
 
 
 	# compute t-statistic and p-value 
@@ -260,7 +333,7 @@ class ExperimentGroup:
 			df = self.df_pvals[(self.df_pvals['Model']==modelType) &\
 							(self.df_pvals['Test']=='test')]
 			sns.histplot(df, x='p-value', hue='vary subject params', \
-				log_scale=True, bins=20, ax=ax)
+				log_scale=True, bins=20, ax=ax, stat='density')
 			ax.set_title(modelType)
 			ax.axvline(0.05,linestyle='--',color='gray')
 		
@@ -279,7 +352,7 @@ class ExperimentGroup:
 			df = self.df_pvals[(self.df_pvals['Model']==modelType) &\
 							(self.df_pvals['Test']=='control')]
 			sns.histplot(df, x='p-value', hue='vary subject params', \
-				log_scale=True, bins=20, ax=ax)
+				log_scale=True, bins=20, ax=ax, stat='density')
 			ax.axvline(0.05,linestyle='--',color='gray')
 			ax.set_title(modelType)
 

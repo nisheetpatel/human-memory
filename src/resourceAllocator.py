@@ -5,11 +5,12 @@ from task import RangelTask
 
 class MemoryResourceAllocator:
     def __init__(self, model='dra', lmda=0.1, sigmaBase=5,\
-                learnPMT=False, delta_pmt=2, delta_1=4, delta_2=1,\
+                learnPMT=False, delta_pmt=4, delta_1=4, delta_2=1,\
                 learning_sigma=0.2, learning_q=0.2, discount=0.95,\
                 nTraj=10, beta=10, gradient='A', nGradUpdates=5, \
                 updateFreq=1, decay=1, decay1=0.98,\
-                printFreq=50, printUpdates=False):
+                printFreq=50, printUpdates=False, adaptDelta=False,
+				stepSize_adaptDelta=1, nTrials_adaptDelta=20):
 
         np.random.seed()
         self.env            = RangelTask(learnPMT=learnPMT, \
@@ -26,7 +27,10 @@ class MemoryResourceAllocator:
         self.updateFreq     = updateFreq
         self.nGradUpdates   = nGradUpdates
         self.model          = model
-        
+        self.adaptDelta     = adaptDelta
+        self.stepSize_adaptD= stepSize_adaptDelta
+        self.nTrials_adaptD = nTrials_adaptDelta
+
         models = ['dra','equalPrecision','freq-s','freq-sa','stakes']
         assert model in models, f"Invalid model type. \
                     \n Model must be one of {models}."
@@ -56,6 +60,7 @@ class MemoryResourceAllocator:
 
         # Initialising array to record choices
         self.choicePMT  = np.nan * np.ones(self.env.episodes)
+        self.outcomePMT = np.nan * np.ones(self.env.episodes)
 
 
     def softmax(self, x):
@@ -126,9 +131,14 @@ class MemoryResourceAllocator:
             # Determine next action
             action, _, _, actions = self.act(state)
 
-            # record choices for PMT trials:
+            # record choices and outcomes for PMT trials:
             if self.env.pmt_trial[self.env.episode]:
-                    self.choicePMT[self.env.episode] = action
+                self.choicePMT[self.env.episode] = action
+
+                if self.env.pmt_trial[self.env.episode] == 1:
+                    self.outcomePMT[self.env.episode] = action//12
+                elif self.env.pmt_trial[self.env.episode] == -1:
+                    self.outcomePMT[self.env.episode] = 1 - (action//12)/2
 
             # Get next state and reward
             s1, reward, done, info = self.env.step(action)
@@ -331,22 +341,6 @@ class MemoryResourceAllocator:
 
         # Scalar sigma optimization for all other models
         else:
-            # Gradient-free optimization
-            # # set upper bound for search and normalization
-            # if self.model == 'freqBased':
-            #     norm = (self.c + np.sqrt(self.n_visits_w))
-            #     ub = np.max(norm) * self.sigmaBase
-
-            # elif self.model == 'equalPrecision':
-            #     norm = np.ones(self.sigma.shape)
-            #     ub = self.sigmaBase
-
-            # # Optimize
-            # res = minimize_scalar(self.minusObjective,\
-            #         method='Bounded', bounds=[0.01,ub])
-            # self.sigma = res.x / norm
-                # Gradient-based optimization for DRA
-
             grads = []
             self.computeNormFactor()
 
@@ -442,6 +436,7 @@ class MemoryResourceAllocator:
         # Initialize variables to track rewards
         reward_list = []
         ave_reward_list = []
+        counter = 0
         
         for ii in range(self.env.episodes-1):
             # run episode
@@ -457,17 +452,28 @@ class MemoryResourceAllocator:
                     Objective = {np.around(ave_reward-self.computeCost(),2)}')
             
             # resource allocation:
-            if self.model == 'dra':
-                # 10 gradient updates per episode for DRA
-                for _ in range(self.nGradUpdates):
-                    self.allocateResources()
-            else:
-                # find optimum every updateFreq episodes
-                # if (ii+1) % self.updateFreq == 0:
-                #     self.allocateResources()
-                for _ in range(self.nGradUpdates):
-                    self.allocateResources()
+            for _ in range(self.nGradUpdates):
+                self.allocateResources()
 
+            # adaptive setting of experimental parameter delta_PMT
+            if self.adaptDelta:
+                a = 0.16 * self.stepSize_adaptD
+                b = 0.84 * self.stepSize_adaptD
+
+                if not np.isnan(self.outcomePMT[ii]):
+                    counter += 1
+                    if counter > self.nTrials_adaptD/2:
+                        decay = max(2*(1-counter/self.nTrials_adaptD),0)
+                    else:
+                        decay = 1
+
+                    if  self.outcomePMT[ii]:
+                        self.env.delta_pmt -= a * decay
+                    else:
+                        self.env.delta_pmt += b * decay
+
+                    self.env.delta_pmt = np.clip(self.env.delta_pmt, 1.5, 7.5)
+                
 
     @property
     def memoryTable(self):
@@ -479,7 +485,7 @@ class MemoryResourceAllocator:
         return df
 
 
-# Saving stuff
+
 if __name__ == '__main__':
     from time import time
     import datetime as dt

@@ -2,12 +2,21 @@ import numpy as np
 import random
 
 class RangelTask:
-    # @n_states:    Number of states
-    # @states:      State indices
-    # @pstate:      probability of state occurance
-    # @task:        standard or precision measuring (PMT)
+    """
+    2AFC task with 12 options, grouped into 4 states of 3 options each.
+    On each trial, one of the four states is selected with probability
+    p(state), and two options are drawn from it uniformly at random.
+
+    Note: 
+        The variable name "state" defined below uses the standard RL
+        convention of state and NOT the state as mentioned above. 
+        If the above convention was to be followed, I would use options
+        as the variable name instead of states. 
+    Note to self: 
+        Try to rewrite the code to reflect this!
+    """
     def __init__(self, episodes_train=510, episodes_pmt=1020, n_pmt=20,
-        learnPMT=False, delta_1=4, delta_2=1, delta_pmt=2):
+        learnPMT=False, delta_1=4, delta_2=1, delta_pmt=4):
         
         # states, acitons, and probability of occurance of states
         self.n_states = 12 * 3
@@ -137,7 +146,6 @@ class RangelTask:
             done = False
 
         return next_state, reward, done, info
-
 
 
 
