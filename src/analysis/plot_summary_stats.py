@@ -114,8 +114,6 @@ def plot_summary_stats(
     plt.savefig(f"{directory}choice_accuracy_test_sessions.svg")
     plt.close()
 
-    return
-
 
 if __name__ == "__main__":
     print("\nThis file is not supposed to be run as a script.")
