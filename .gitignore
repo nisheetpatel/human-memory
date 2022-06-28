@@ -1,5 +1,6 @@
-# Cache files from python
+# Cache files from python and linters
 __pycache__
+.mypy_cache/
 
 # Figure and data folders
 figures/
