@@ -1,24 +1,11 @@
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Callable, List
 
 import numpy as np
 
-from customtypes import (
-    Action,
-    ActionSpace,
-    Done,
-    Experience,
-    ExperienceBuffer,
-    Info,
-    ModelName,
-    Reward,
-    State,
-)
-
-# from resourceAllocators import DynamicResourceAllocator, MemoryResourceAllocator
-# from simulator import act_and_step
-# from tasks import Environment
+from customtypes import (Action, ActionSpace, Done, Experience,
+                         ExperienceBuffer, Info, ModelName, Reward, State)
 
 
 @dataclass
@@ -211,8 +198,6 @@ class NoisyQAgent(ABC):
         # reset the original state
         self.sigma[12:] = 0
 
-        return
-
 
 @dataclass
 class DRA(NoisyQAgent):
@@ -246,7 +231,9 @@ class DRA(NoisyQAgent):
 class FreqRA(NoisyQAgent):
     model: ModelName = ModelName.FREQ
     sigma_scalar: float = 1
-    sigma_history: List = field(default_factory=[])
+
+    def __post_init__(self):
+        self.sigma_history: List = []
 
     @property
     def norm(self):
@@ -258,7 +245,9 @@ class FreqRA(NoisyQAgent):
 class StakesRA(NoisyQAgent):
     model: ModelName = ModelName.STAKES
     sigma_scalar: float = 1
-    sigma_history: List = field(default_factory=[])
+
+    def __post_init__(self):
+        self.sigma_history: List = []
 
     @property
     def norm(self):
@@ -271,7 +260,9 @@ class StakesRA(NoisyQAgent):
 class EqualRA(NoisyQAgent):
     model: ModelName = ModelName.EQUALPRECISION
     sigma_scalar: float = 1
-    sigma_history: List = field(default_factory=[])
+
+    def __post_init__(self):
+        self.sigma_history: List = []
 
     @property
     def norm(self):
