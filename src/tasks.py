@@ -1,24 +1,25 @@
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Protocol, Tuple
+from typing import Tuple
 
 import numpy as np
 
 from customtypes import Action, ActionSpace, Done, Info, Reward, State
 
 
-class Environment(Protocol):
+class Environment(ABC):
     @property
+    @abstractmethod
     def action_space(self) -> ActionSpace:
         """List available actions."""
-        ...
 
+    @abstractmethod
     def reset(self) -> State:
         """Reset environment state for the new episode."""
-        ...
 
+    @abstractmethod
     def step(self, action: Action) -> Tuple[State, Reward, Done, Info]:
         """Step in the environment."""
-        ...
 
 
 class FinalEpisodeError(Exception):
@@ -26,7 +27,7 @@ class FinalEpisodeError(Exception):
 
 
 @dataclass
-class Memory2AFC:
+class Memory2AFC(Environment):
     """
     2AFC (2 alternative forced-choice) task with 12 options,
         grouped into 4 sets of 3 options each.
@@ -80,13 +81,6 @@ class Memory2AFC:
         self._episode = 0
         self._pregenerate_episodes()
         self.n_episodes = len(self._episode_list)
-
-        # known option rewards
-        # self.q_fixed = np.array([False] * 12 + [True] * 24)
-        # self.q_initial = np.append(self.option_rewards * self.q_fixed, 0)
-        # self.q_initial[:12] = 10
-        # self.q_initial = np.array(self.q_initial, dtype=float)
-        # self.q_fixed = np.append(self.q_fixed, np.array([True]))  # terminal
 
     @staticmethod
     def option_choice_set(state: State) -> list:
@@ -163,12 +157,12 @@ class Memory2AFC:
         return
 
     def is_task_finished(self) -> bool:
-        return self._episode < len(self._episode_list)
+        return self._episode == len(self._episode_list)
 
     def reset(self) -> State:
         """Update state to the next one (pre-generated)."""
 
-        if not self.is_task_finished():
+        if self.is_task_finished():
             raise FinalEpisodeError("Go home. No more trials left!")
 
         self._state = self._episode_list[self._episode]
@@ -178,7 +172,7 @@ class Memory2AFC:
     def step(self, action: Action) -> Tuple[State, Reward, Done, Info]:
         """Step in the environment."""
 
-        if not self.is_task_finished():
+        if self.is_task_finished():
             print("Ignoring step calls beyond what the environment allows.")
 
         # next state, reward, termination
