@@ -1,7 +1,5 @@
 from dataclasses import dataclass
 
-import numpy as np
-
 from customtypes import Done, Experience, Reward, State
 from models import Agent, NoisyQAgent
 from tasks import Environment
@@ -12,7 +10,7 @@ def act_and_step(
 ) -> tuple[Experience, Done]:
     """Agent takes an action, environment steps."""
     # Determine next action
-    action, prob_actions, zeta = agent.act(state, env.action_space)
+    action, prob_actions, zeta = agent.act(state)
 
     # Get next state and reward
     next_state, reward, done, _ = env.step(action)
@@ -24,8 +22,7 @@ def act_and_step(
         "reward": reward,
         "next_state": next_state,
         "zeta": zeta,
-        "action_idx": (np.array(env.action_space) == action),
-        "action_space": env.action_space,
+        "choice_set": env.choice_set,
         "prob_actions": prob_actions,
     }
 
