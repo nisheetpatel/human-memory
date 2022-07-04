@@ -1,11 +1,12 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Callable, List
+from typing import Callable
 
 import numpy as np
 
-from customtypes import (Action, ActionSpace, Done, Experience,
-                         ExperienceBuffer, Info, ModelName, Reward, State)
+from customtypes import (Action, Done, Experience, ExperienceBuffer, Info,
+                         ModelName, Reward, State)
+from indexer import indexer_2afc
 
 
 @dataclass
@@ -20,7 +21,7 @@ class ModelParams:
 
 class Agent(ABC):
     @abstractmethod
-    def act(self, state: State, action_space: ActionSpace) -> Action:
+    def act(self, state: State) -> Action:
         """Select an action."""
 
     @abstractmethod
@@ -45,26 +46,6 @@ def softargmax(x: np.ndarray, beta: float = 1) -> np.ndarray:
 
 
 @dataclass
-class IndexingError(Exception):
-    error: str
-
-
-def indexer_2afc(
-    state: State = None, action: Action = None, action_space: ActionSpace = None
-):
-    """Returns q-table index entry for the Memory 2AFC task."""
-    if state == -1:
-        return state
-    if (action is None) & (action_space is None):
-        raise IndexingError("Both action and action space cannot be none.")
-    if action is not None:
-        return action
-    if action_space is not None:
-        return action_space
-    raise IndexingError("Fatal: no cases match for indexer.")
-
-
-@dataclass
 class NoisyQAgent(ABC):
     q_size: int
     model: ModelName
@@ -84,10 +65,10 @@ class NoisyQAgent(ABC):
         # initializing experience buffer
         self.exp_buffer: ExperienceBuffer = []
 
-    def act(self, state: State, action_space: ActionSpace):
-        # fetch index and define n_actions
-        n_actions = len(action_space)
-        idx = self._index(state=state, action_space=action_space)
+    def act(self, state: State):
+        # fetch index
+        idx = self._index(state=state)
+        n_actions = len(idx)
 
         # draw from noisy memory distribution and determine action probabilities
         zeta = np.random.randn(n_actions)
@@ -103,9 +84,7 @@ class NoisyQAgent(ABC):
 
     def _compute_indices(self, experience: Experience):
         """Compute all indices for possible operations."""
-        idx_s = self._index(
-            state=experience["state"], action_space=experience["action_space"]
-        )
+        idx_s = self._index(state=experience["state"])
         idx_s1 = self._index(state=experience["next_state"])
         idx_sa = self._index(state=experience["state"], action=experience["action"])
         return idx_s, idx_s1, idx_sa
@@ -121,8 +100,6 @@ class NoisyQAgent(ABC):
 
         # update values
         self.q[idx_sa] += self.p.lr * delta
-
-        return
 
     def update_visit_counts(self, experience: Experience) -> None:
         self.state_visit_counts[experience["state"]] += 1
@@ -173,7 +150,6 @@ class NoisyQAgent(ABC):
 
         # sigma_scalar can be noisy; so we update with its moving average
         self.sigma[:12] = np.mean(self.sigma_history[-25:]) / self.norm[:12]
-        return
 
     def allocate_memory_resources(self):
         """Update agent's noise (sigma) parameters."""
@@ -230,10 +206,6 @@ class DRA(NoisyQAgent):
 @dataclass
 class FreqRA(NoisyQAgent):
     model: ModelName = ModelName.FREQ
-    sigma_scalar: float = 1
-
-    def __post_init__(self):
-        self.sigma_history: List = []
 
     @property
     def norm(self):
@@ -244,10 +216,6 @@ class FreqRA(NoisyQAgent):
 @dataclass
 class StakesRA(NoisyQAgent):
     model: ModelName = ModelName.STAKES
-    sigma_scalar: float = 1
-
-    def __post_init__(self):
-        self.sigma_history: List = []
 
     @property
     def norm(self):
@@ -259,10 +227,6 @@ class StakesRA(NoisyQAgent):
 @dataclass
 class EqualRA(NoisyQAgent):
     model: ModelName = ModelName.EQUALPRECISION
-    sigma_scalar: float = 1
-
-    def __post_init__(self):
-        self.sigma_history: List = []
 
     @property
     def norm(self):
