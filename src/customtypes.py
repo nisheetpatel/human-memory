@@ -3,7 +3,6 @@ from typing import TypedDict
 
 # custom type aliases
 Action = int
-ActionSpace = list[int, int]
 State = int
 Reward = float
 Done = bool
@@ -24,7 +23,6 @@ class Experience(TypedDict):
     next_state: State
     zeta: list[float]
     action_idx: int
-    action_space: ActionSpace
     prob_actions: list[float]
 
 
