@@ -6,17 +6,8 @@ import numpy as np
 
 from customtypes import (Action, Done, Experience, ExperienceBuffer, Info,
                          ModelName, Reward, State)
-from indexer import indexer_2afc
-
-
-@dataclass
-class ModelParams:
-    sigma_base: float = 5
-    gamma: float = 1
-    beta: float = 1
-    lmda: float = 0.1
-    lr: float = 0.1
-    n_trajectories: int = 10
+from q_table import QTable
+from utils import ModelParams, indexer_2afc
 
 
 class Agent(ABC):
@@ -53,7 +44,7 @@ class NoisyQAgent(ABC):
     _index: Callable = indexer_2afc
 
     def __post_init__(self):
-        self.q = np.zeros(self.q_size)
+        self.q_table = QTable(size=self.q_size, p=self.p)
         self.sigma = self.p.sigma_base * np.ones(self.q_size)
         self.sigma_scalar = 1
         self.sigma_history = []
@@ -72,7 +63,7 @@ class NoisyQAgent(ABC):
 
         # draw from noisy memory distribution and determine action probabilities
         zeta = np.random.randn(n_actions)
-        prob_actions = softargmax(self.q[idx] + zeta * self.sigma[idx], self.p.beta)
+        prob_actions = softargmax(self.q_table.values[idx] + zeta * self.sigma[idx], self.p.beta)
 
         # choose action randomly given action probabilities
         action = np.random.choice(np.arange(n_actions), p=prob_actions)
@@ -90,16 +81,7 @@ class NoisyQAgent(ABC):
         return idx_s, idx_s1, idx_sa
 
     def update_values(self, experience: Experience) -> None:
-        # compute relevant indices
-        _, idx_s1, idx_sa = self._compute_indices(experience)
-
-        # compute prediction error
-        target = experience["reward"] + self.p.gamma * np.max(self.q[idx_s1])
-        prediction = self.q[idx_sa]
-        delta = target - prediction
-
-        # update values
-        self.q[idx_sa] += self.p.lr * delta
+        self.q_table.update(experience)
 
     def update_visit_counts(self, experience: Experience) -> None:
         self.state_visit_counts[experience["state"]] += 1
@@ -112,7 +94,7 @@ class NoisyQAgent(ABC):
 
     def _compute_advantage(self, experience: Experience) -> float:
         idx_s, _, idx_sa = self._compute_indices(experience)
-        return self.q[idx_sa] - np.dot(self.q[idx_s], experience["prob_actions"])
+        return self.q_table.values[idx_sa] - np.dot(self.q_table.values[idx_s], experience["prob_actions"])
 
     def _initialize_grad(self):
         """Initialize scalar gradient by default."""
