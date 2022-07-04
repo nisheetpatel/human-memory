@@ -4,13 +4,14 @@ from typing import Tuple
 
 import numpy as np
 
-from customtypes import Action, ActionSpace, Done, Info, Reward, State
+from customtypes import Action, Done, Info, Reward, State
+from indexer import option_choice_set_2afc
 
 
 class Environment(ABC):
     @property
     @abstractmethod
-    def action_space(self) -> ActionSpace:
+    def choice_set(self) -> list[int, int]:
         """List available actions."""
 
     @abstractmethod
@@ -82,28 +83,12 @@ class Memory2AFC(Environment):
         self._pregenerate_episodes()
         self.n_episodes = len(self._episode_list)
 
-    @staticmethod
-    def option_choice_set(state: State) -> list:
-        """Returns choice set for Memory_2AFC task."""
-        if state < 12:
-            if state % 3 == 0:
-                choice_set = [state + 1, state + 2]  # 1 v 2; PMT 0
-            elif state % 3 == 1:
-                choice_set = [state - 1, state + 1]  # 0 v 2; PMT 1
-            else:
-                choice_set = [state - 2, state - 1]  # 0 v 1; PMT 2
-        elif state < 24:
-            choice_set = [state - 12, state]
-        elif state < 36:
-            choice_set = [state - 24, state]
-        return choice_set
-
     @property
-    def action_space(self) -> ActionSpace:
-        return self.option_choice_set(self._state)
+    def choice_set(self) -> list[int, int]:
+        return option_choice_set_2afc(self._state)
 
     def reward(self, action: Action) -> Reward:
-        option_chosen = self.action_space[action]
+        option_chosen = self.choice_set[action]
         reward = self.option_rewards[option_chosen]
 
         # stochastic rewards for the regular options
