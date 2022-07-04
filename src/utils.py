@@ -33,3 +33,13 @@ def indexer_2afc(state: State = None, action: Action = None):
     if state is not None:
         return option_choice_set_2afc(state)
     raise IndexingError("Fatal: no cases match for indexer.")
+
+
+@dataclass
+class ModelParams:
+    sigma_base: float = 5
+    gamma: float = 1
+    beta: float = 1
+    lmda: float = 0.1
+    lr: float = 0.1
+    n_trajectories: int = 10
