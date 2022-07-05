@@ -5,7 +5,7 @@ from typing import Tuple
 import numpy as np
 
 from customtypes import Action, Done, Info, Reward, State
-from indexer import option_choice_set_2afc
+from utils import option_choice_set_2afc
 
 
 class Environment(ABC):
