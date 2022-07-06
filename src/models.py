@@ -25,9 +25,7 @@ class Agent(ABC):
 
 def softargmax(x: np.ndarray, beta: float = 1) -> np.ndarray:
     """Action policy."""
-    x = np.array(x)
-    b = np.max(beta * x)
-    y = np.exp(beta * x - b)
+    y = np.exp(beta * x - np.max(beta * x))
     return y / y.sum()
 
 
