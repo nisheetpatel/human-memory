@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from typing import Union
 
 import numpy as np
 
@@ -13,6 +14,7 @@ def get_indices(experience: Experience) -> tuple:
     idx_sa = indexer_2afc(state=experience["state"], action=experience["action"])
     return idx_s, idx_s1, idx_sa
 
+
 def compute_advantage(experience: Experience, q_values: np.ndarray) -> float:
     """currently returning reward NOT advantage"""
     idx_s, _, idx_sa = get_indices(experience)
@@ -20,7 +22,7 @@ def compute_advantage(experience: Experience, q_values: np.ndarray) -> float:
 
 
 class QTable:
-    def __init__(self, size: int, p: ModelParams):
+    def __init__(self, size: int, p: ModelParams) -> None:
         self.values = np.zeros(size)
         self.p = p
 
@@ -38,9 +40,43 @@ class QTable:
 
 
 class NoiseTable(ABC):
+    values: np.ndarray
+    p: ModelParams
+
     @abstractmethod
-    def update(self, experience_buffer: ExperienceBuffer, q_values: np.ndarray):
-        """Update noise table"""
+    def _initialize_grad(self) -> Union[float, np.ndarray]:
+        """Initialize gradient."""
+
+    @abstractmethod
+    def _compute_grad(self, grad, advantage: float, exp: Experience):
+        """Update gradient for the agent"""
+
+    @abstractmethod
+    def _compute_grad_cost(self) -> Union[float, np.ndarray]:
+        """Compute gradient of the cost term for the agent."""
+
+    @abstractmethod
+    def _update_noise(self, delta) -> None:
+        """Update noise vector given delta."""
+
+    def update(self, exp_buffer: ExperienceBuffer, q_values: np.ndarray) -> None:
+        """Update noise table by sampling trajectories from experience buffer."""
+        grads = []
+
+        for experience in exp_buffer[-self.p.n_trajectories :]:
+            psi = compute_advantage(experience, q_values)
+            grads += [self._compute_grad(self._initialize_grad(), psi, experience)]
+
+        # Setting fixed terms to sigma_base to avoid cost and divide by zero error
+        self.values[12:] = self.p.sigma_base
+
+        # Compute average gradient across sampled trajs & cost, then update
+        delta = np.mean(grads, axis=0) - self.p.lmda * self._compute_grad_cost()
+        self._update_noise(delta)
+
+        # Clip sigma to be less than sigma_base, then reset fixed ones to 0
+        self.values = np.clip(self.values, 0.01, self.p.sigma_base)
+        self.values[12:] = 0
 
 
 class NoiseTableDRA(NoiseTable):
@@ -50,53 +86,19 @@ class NoiseTableDRA(NoiseTable):
         self.norm = norm
 
     def _initialize_grad(self):
-        """Initialize scalar gradient by default."""
         return np.zeros(self.values.shape)
 
-    def _update_grad(self, grad, advantage: float, experience: Experience):
-        """Update scalar gradient for the agent"""
-        idx_s, _, idx_sa = get_indices(experience)
-        grad[idx_s] -= (
-            advantage * self.p.beta * experience["zeta"] * experience["prob_actions"]
-        )
-        grad[idx_sa] += (
-            advantage * self.p.beta * experience["zeta"][experience["action"]]
-        )
+    def _compute_grad(self, grad, advantage: float, exp: Experience) -> np.ndarray:
+        idx_s, _, idx_sa = get_indices(exp)
+        grad[idx_s] -= advantage * self.p.beta * exp["zeta"] * exp["prob_actions"]
+        grad[idx_sa] += advantage * self.p.beta * exp["zeta"][exp["action"]]
         return grad
 
-    def _compute_grad_cost(self):
-        """Compute scalar gradient of the cost term for the agent."""
+    def _compute_grad_cost(self) -> np.ndarray:
         return self.values / (self.p.sigma_base**2) - 1 / self.values
 
-    def _update_noise(self, delta):
-        """Update agent's noise vector."""
+    def _update_noise(self, delta) -> None:
         self.values += self.p.lr * delta
-
-    def update(self, experience_buffer: ExperienceBuffer, q_values: np.ndarray):
-        """Update agent's noise (sigma) parameters."""
-        grads = []
-
-        for experience in experience_buffer[-self.p.n_trajectories :]:
-            psi = compute_advantage(experience, q_values)
-            grads += [self._update_grad(self._initialize_grad(), psi, experience)]
-
-        # Setting fixed and terminal sigmas to sigma_base to avoid
-        # divide by zero error; reset to 0 at the end of the loop
-        self.values[12:] = self.p.sigma_base
-
-        # Compute average gradient across sampled trajs & cost
-        grad_cost = self._compute_grad_cost()
-        grad_mean = np.mean(grads, axis=0)
-        delta = grad_mean - self.p.lmda * grad_cost
-
-        # Updating sigmas
-        self._update_noise(delta)
-
-        # Clip sigma to be less than sigma_base
-        self.values = np.clip(self.values, 0.01, self.p.sigma_base)
-
-        # reset the original state
-        self.values[12:] = 0
 
 
 class NoiseTableScalar(NoiseTable):
@@ -107,30 +109,20 @@ class NoiseTableScalar(NoiseTable):
         self.sigma_history = []
         self.norm = norm
 
-    def _compute_advantage(self, experience: Experience) -> float:
-        """currently returning reward NOT advantage"""
-        return experience["reward"]
-
     def _initialize_grad(self):
-        """Initialize scalar gradient by default."""
         return 0
 
-    def _update_grad(self, grad, advantage: float, experience: Experience):
-        """Update scalar gradient for the agent"""
-        idx_s, _, idx_sa = get_indices(experience)
+    def _compute_grad(self, grad, advantage: float, exp: Experience) -> float:
+        idx_s, _, idx_sa = get_indices(exp)
         grad -= advantage * (
-            self.p.beta
-            * np.dot(experience["zeta"] / self.norm[idx_s], experience["prob_actions"])
+            self.p.beta * np.dot(exp["zeta"] / self.norm[idx_s], exp["prob_actions"])
         )
         grad += (
-            advantage
-            * (self.p.beta * experience["zeta"][experience["action"]])
-            / self.norm[idx_sa]
+            advantage * (self.p.beta * exp["zeta"][exp["action"]]) / self.norm[idx_sa]
         )
         return grad
 
-    def _compute_grad_cost(self):
-        """Compute scalar gradient of the cost term for the agent."""
+    def _compute_grad_cost(self) -> float:
         grad_cost = -12 / self.sigma_scalar + self.sigma_scalar / (
             self.p.sigma_base**2
         ) * np.sum(
@@ -140,36 +132,9 @@ class NoiseTableScalar(NoiseTable):
         )
         return grad_cost
 
-    def _update_noise(self, delta):
-        """Update agent's noise vector."""
+    def _update_noise(self, delta) -> None:
         self.sigma_scalar += self.p.lr * delta
         self.sigma_history.append(self.sigma_scalar)
 
         # sigma_scalar can be noisy; so we update with its moving average
         self.values[:12] = np.mean(self.sigma_history[-25:]) / self.norm[:12]
-
-    def update(self, experience_buffer: ExperienceBuffer, q_values: np.ndarray):
-        """Update agent's noise (sigma) parameters."""
-        grads = []
-
-        for experience in experience_buffer[-self.p.n_trajectories :]:
-            psi = compute_advantage(experience, q_values)
-            grads += [self._update_grad(self._initialize_grad(), psi, experience)]
-
-        # Setting fixed and terminal sigmas to sigma_base to avoid
-        # divide by zero error; reset to 0 at the end of the loop
-        self.values[12:] = self.p.sigma_base
-
-        # Compute average gradient across sampled trajs & cost
-        grad_cost = self._compute_grad_cost()
-        grad_mean = np.mean(grads, axis=0)
-        delta = grad_mean - self.p.lmda * grad_cost
-
-        # Updating sigmas
-        self._update_noise(delta)
-
-        # Clip sigma to be less than sigma_base
-        self.values = np.clip(self.values, 0.01, self.p.sigma_base)
-
-        # reset the original state
-        self.values[12:] = 0
