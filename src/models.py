@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
-from typing import Callable
+from dataclasses import dataclass, field
+from typing import Callable, Protocol, Type, Union
 
 import numpy as np
 
@@ -22,10 +22,6 @@ class Agent(ABC):
     def observe(self, experience: Experience) -> None:
         """Observe consequences of last action and cache them in ExperienceBuffer."""
 
-    @abstractmethod
-    def update_visit_counts(self, experience: Experience) -> None:
-        """Update agent's visit counts based on experience."""
-
 
 def softargmax(x: np.ndarray, beta: float = 1) -> np.ndarray:
     """Action policy."""
@@ -37,21 +33,13 @@ def softargmax(x: np.ndarray, beta: float = 1) -> np.ndarray:
 
 @dataclass
 class NoisyQAgent(Agent):
-    q_size: int
+    size: int
     model: ModelName
+    q_table: QTable
+    noise_table: NoiseTable
     p: ModelParams = ModelParams()
     _index: Callable = indexer_2afc
-
-    def __post_init__(self, noise_table: NoiseTable):
-        self.q_table = QTable(size=self.q_size, p=self.p)
-        self.noise_table = noise_table
-
-        # visit counters
-        self.action_visit_counts = np.ones(self.q_size, dtype=int)
-        self.state_visit_counts = np.ones(self.q_size, dtype=int)
-
-        # initializing experience buffer
-        self.exp_buffer: ExperienceBuffer = []
+    exp_buffer: ExperienceBuffer = field(default_factory=list)
 
     def act(self, state: State):
         # fetch index
@@ -60,7 +48,9 @@ class NoisyQAgent(Agent):
 
         # draw from noisy memory distribution and determine action probabilities
         zeta = np.random.randn(n_actions)
-        prob_actions = softargmax(self.q_table.values[idx] + zeta * self.noise_table.values[idx], self.p.beta)
+        prob_actions = softargmax(
+            self.q_table.values[idx] + zeta * self.noise_table.values[idx], self.p.beta
+        )
 
         # choose action randomly given action probabilities
         action = np.random.choice(np.arange(n_actions), p=prob_actions)
@@ -74,70 +64,74 @@ class NoisyQAgent(Agent):
     def update_values(self, experience: Experience) -> None:
         self.q_table.update(experience)
 
-    def update_visit_counts(self, experience: Experience) -> None:
-        self.state_visit_counts[experience["state"]] += 1
-        self.action_visit_counts[experience["action"]] += 1
-
-    @property
-    def norm(self):
-        return 1
-
-    def allocate_memory_resources(self):
-        self.noise_table.norm = self.norm
+    def allocate_memory_resources(self) -> None:
         self.noise_table.update(self.exp_buffer, self.q_table.values)
 
 
 @dataclass
-class DRA(NoisyQAgent):
-    model: ModelName = ModelName.DRA
+class AgentCreator(Protocol):
+    size: int
+    p: ModelParams
+    norm: Union[float, np.ndarray]
 
-    def __post_init__(self):
-        noise_table = NoiseTableDRA(self.q_size, self.p, self.norm)
-        super().__post_init__(noise_table)
+
+def make_agent(
+    obj: AgentCreator, model_name: ModelName, noise_table: Type[NoiseTable]
+) -> NoisyQAgent:
+    q_table = QTable(obj.size, obj.p)
+    noise_table = noise_table(obj.size, obj.p, obj.norm)
+    agent = NoisyQAgent(obj.size, model_name, q_table, noise_table, obj.p)
+    return agent
+
+
+@dataclass
+class DRA:
+    size: int
+    p: ModelParams = ModelParams()
+
+    def make(self) -> NoisyQAgent:
+        return make_agent(self, ModelName.DRA, NoiseTableDRA)
 
     @property
     def norm(self) -> float:
         return 1
 
-@dataclass
-class FreqRA(NoisyQAgent):
-    model: ModelName = ModelName.FREQ
-    
-    def __post_init__(self):
-        # visit counters
-        self.action_visit_counts = np.ones(self.q_size, dtype=int)
-        self.state_visit_counts = np.ones(self.q_size, dtype=int)
 
-        noise_table = NoiseTableScalar(self.q_size, self.p, self.norm)
-        super().__post_init__(noise_table)
+@dataclass
+class FreqRA:
+    size: int
+    p: ModelParams = ModelParams()
+
+    def make(self) -> NoisyQAgent:
+        return make_agent(self, ModelName.FREQ, NoiseTableScalar)
 
     @property
-    def norm(self):
-        norm_factor = np.sqrt(self.state_visit_counts)
+    def norm(self) -> np.ndarray:
+        norm_factor = np.repeat([4, 1], 6)
         return 12 * norm_factor / np.sum(norm_factor[:12])
 
 
 @dataclass
-class StakesRA(NoisyQAgent):
-    model: ModelName = ModelName.STAKES
-    
-    def __post_init__(self):
-        noise_table = NoiseTableScalar(self.q_size, self.p, self.norm)
-        super().__post_init__(noise_table)
+class StakesRA:
+    size: int
+    p: ModelParams = ModelParams()
+
+    def make(self) -> NoisyQAgent:
+        return make_agent(self, ModelName.STAKES, NoiseTableScalar)
 
     @property
-    def norm(self):
+    def norm(self) -> np.ndarray:
         norm_factor = np.tile(np.repeat([4, 1], 3), 2)
         return 12 * norm_factor / np.sum(norm_factor[:12])
 
 
 @dataclass
-class EqualRA(NoisyQAgent):
-    model: ModelName = ModelName.EQUALPRECISION
+class EqualRA:
+    size: int
+    p: ModelParams = ModelParams()
 
-    def __post_init__(self):
-        noise_table = NoiseTableScalar(self.q_size, self.p, self.norm)
-        super().__post_init__(noise_table)
+    def make(self) -> NoisyQAgent:
+        return make_agent(self, ModelName.EQUALPRECISION, NoiseTableScalar)
 
     @property
     def norm(self):
