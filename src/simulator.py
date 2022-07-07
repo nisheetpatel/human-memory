@@ -53,3 +53,7 @@ class Simulator:
         self.agent.allocate_memory_resources()
 
         return tot_reward
+
+    def train_agent(self) -> None:
+        for _ in range(self.env.n_episodes):  # pylint: disable=no-member
+            self.run_episode()
