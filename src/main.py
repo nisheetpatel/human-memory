@@ -31,8 +31,7 @@ def train_all_models() -> None:
 
     for simulator in simulators:
         print(f"Training {simulator.agent.model.value}")
-        for _ in range(1770):
-            simulator.run_episode()
+        simulator.train_agent()
 
     print("\nFinished training!\n")
 
