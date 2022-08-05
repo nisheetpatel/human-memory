@@ -4,14 +4,14 @@ from typing import Union
 import numpy as np
 
 from customtypes import Experience, ExperienceBuffer
-from utils import ModelParams, indexer_2afc
+from utils import ModelParams, indexer_slots
 
 
 def get_indices(experience: Experience) -> tuple:
     """Compute all indices for possible operations."""
-    idx_s = indexer_2afc(state=experience["state"])
-    idx_s1 = indexer_2afc(state=experience["next_state"])
-    idx_sa = indexer_2afc(state=experience["state"], action=experience["action"])
+    idx_s = indexer_slots(state=experience["state"])
+    idx_s1 = indexer_slots(state=experience["next_state"])
+    idx_sa = indexer_slots(state=experience["state"], action=experience["action"])
     return idx_s, idx_s1, idx_sa
 
 
@@ -36,7 +36,8 @@ class QTable:
         delta = target - prediction
 
         # update values
-        self.values[idx_sa] += self.p.lr * delta
+        if target != 0:
+            self.values[idx_sa] += self.p.lr * delta
 
 
 class NoiseTable(ABC):
@@ -68,7 +69,7 @@ class NoiseTable(ABC):
             grads += [self._compute_grad(self._initialize_grad(), psi, experience)]
 
         # Setting fixed terms to sigma_base to avoid cost and divide by zero error
-        self.values[12:] = self.p.sigma_base
+        self.values[4:] = self.p.sigma_base
 
         # Compute average gradient across sampled trajs & cost, then update
         delta = np.mean(grads, axis=0) - self.p.lmda * self._compute_grad_cost()
@@ -76,7 +77,7 @@ class NoiseTable(ABC):
 
         # Clip sigma to be less than sigma_base, then reset fixed ones to 0
         self.values = np.clip(self.values, 0.01, self.p.sigma_base)
-        self.values[12:] = 0
+        self.values[4:] = 0
 
 
 class NoiseTableDRA(NoiseTable):
@@ -113,21 +114,21 @@ class NoiseTableScalar(NoiseTable):
         return 0
 
     def _compute_grad(self, grad, advantage: float, exp: Experience) -> float:
-        idx_s, _, idx_sa = get_indices(exp)
+        idx_s, _, _ = get_indices(exp)
         grad -= advantage * (
-            self.p.beta * np.dot(exp["zeta"] / self.norm[idx_s], exp["prob_actions"])
+            self.p.beta * np.dot(exp["zeta"] / self.norm[idx_s[0]], exp["prob_actions"])
         )
         grad += (
-            advantage * (self.p.beta * exp["zeta"][exp["action"]]) / self.norm[idx_sa]
+            advantage * (self.p.beta * exp["zeta"][exp["action"]]) / self.norm[idx_s[0]]
         )
         return grad
 
     def _compute_grad_cost(self) -> float:
-        grad_cost = -12 / self.sigma_scalar + self.sigma_scalar / (
+        grad_cost = -4 / self.sigma_scalar + self.sigma_scalar / (
             self.p.sigma_base**2
         ) * np.sum(
             np.minimum(
-                1 / self.norm[:12], self.p.sigma_base**2 / self.sigma_scalar**2
+                1 / self.norm[:4], self.p.sigma_base**2 / self.sigma_scalar**2
             )
         )
         return grad_cost
@@ -137,4 +138,4 @@ class NoiseTableScalar(NoiseTable):
         self.sigma_history.append(self.sigma_scalar)
 
         # sigma_scalar can be noisy; so we update with its moving average
-        self.values[:12] = np.mean(self.sigma_history[-25:]) / self.norm[:12]
+        self.values[:4] = np.mean(self.sigma_history[-25:]) / self.norm[:4]

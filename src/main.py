@@ -2,24 +2,23 @@ import numpy as np
 
 from models import DRA, EqualRA, FreqRA, StakesRA
 from simulator import Simulator
-from tasks import Memory2AFC
+from tasks import SlotMachines
 
 
 def train_dra() -> None:
-    env = Memory2AFC()
+    env = SlotMachines()
     agent = DRA(size=env.n_states).make()
     simulator = Simulator(agent, env)
 
     print(f"Training {agent.model.value}")
 
-    for _ in range(1770):
-        simulator.run_episode()
+    simulator.train_agent()
 
     print("\nFinished training!\n")
 
 
 def train_all_models() -> None:
-    envs = [Memory2AFC() for _ in range(4)]
+    envs = [SlotMachines() for _ in range(4)]
     size = envs[0].n_states
     agents = [
         DRA(size).make(),

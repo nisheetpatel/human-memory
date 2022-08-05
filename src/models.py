@@ -6,7 +6,7 @@ import numpy as np
 
 from customtypes import Action, Experience, ExperienceBuffer, ModelName, State
 from q_table import NoiseTable, NoiseTableDRA, NoiseTableScalar, QTable
-from utils import ModelParams, indexer_2afc
+from utils import ModelParams, indexer_slots
 
 
 class Agent(ABC):
@@ -36,7 +36,7 @@ class NoisyQAgent(Agent):
     q_table: QTable
     noise_table: NoiseTable
     p: ModelParams = ModelParams()
-    _index: Callable = indexer_2afc
+    _index: Callable = indexer_slots
     exp_buffer: ExperienceBuffer = field(default_factory=list)
 
     def act(self, state: State):
@@ -56,7 +56,7 @@ class NoisyQAgent(Agent):
         return action, prob_actions, zeta
 
     def observe(self, experience: Experience) -> None:
-        if experience["state"] < 12:
+        if experience["state"] < 16:
             self.exp_buffer += [experience]
 
     def update_values(self, experience: Experience) -> None:
@@ -105,8 +105,8 @@ class FreqRA:
 
     @property
     def norm(self) -> np.ndarray:
-        norm_factor = np.repeat([4, 1], 6)
-        return 12 * norm_factor / np.sum(norm_factor[:12])
+        norm_factor = np.array([3, 3, 1, 1])
+        return 4 * norm_factor / np.sum(norm_factor[:4])
 
 
 @dataclass
@@ -119,8 +119,8 @@ class StakesRA:
 
     @property
     def norm(self) -> np.ndarray:
-        norm_factor = np.tile(np.repeat([4, 1], 3), 2)
-        return 12 * norm_factor / np.sum(norm_factor[:12])
+        norm_factor = np.array([3, 1, 3, 1])
+        return 4 * norm_factor / np.sum(norm_factor[:4])
 
 
 @dataclass
@@ -133,8 +133,8 @@ class EqualRA:
 
     @property
     def norm(self):
-        norm_factor = np.ones(12)
-        return 12 * norm_factor / np.sum(norm_factor[:12])
+        norm_factor = np.ones(4)
+        return 4 * norm_factor / np.sum(norm_factor[:4])
 
 
 if __name__ == "__main__":

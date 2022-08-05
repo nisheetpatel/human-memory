@@ -35,6 +35,22 @@ def indexer_2afc(state: State = None, action: Action = None):
     raise IndexingError("Fatal: no cases match for indexer.")
 
 
+def option_choice_set_slots(state: State) -> list:
+    """Returns the choice set for Slot Machines task."""
+    return [state // 4, state % 4 + 4]
+
+
+def indexer_slots(state: State = None, action: Action = None):
+    """Returns q-table index entry for the Memory 2AFC task."""
+    if state == -1:
+        return state
+    if (state is not None) & (action is not None):
+        return option_choice_set_slots(state)[action]
+    if state is not None:
+        return option_choice_set_slots(state)
+    raise IndexingError("Fatal: no cases match for indexer.")
+
+
 @dataclass
 class ModelParams:
     sigma_base: float = 5
@@ -43,3 +59,11 @@ class ModelParams:
     lmda: float = 0.1
     lr: float = 0.1
     n_trajectories: int = 10
+
+
+@dataclass
+class SlotTaskParams:
+    delta: float = 1
+    sigma: float = 5
+    rel_freq: float = 3
+    rel_diff: float = 3
