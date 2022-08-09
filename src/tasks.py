@@ -36,7 +36,7 @@ class SlotMachines(Environment):
 
     n_states: int = 8 + 1
     n_actions: int = 2
-    n_blocks: int = 4
+    n_blocks: int = 16
     n_repeats_per_block: int = 3
     p: SlotTaskParams = SlotTaskParams()
 
