@@ -59,6 +59,6 @@ class Simulator:
     def train_agent(self) -> None:
         for i in range(self.env.n_episodes):  # pylint: disable=no-member
             learning = True
-            if i > self.env.n_episodes / 2:  # pylint: disable=no-member
+            if i > self.env.n_episodes - 2 * 192:  # pylint: disable=no-member
                 learning = False
             self.run_episode(learning)
