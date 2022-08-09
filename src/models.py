@@ -37,7 +37,7 @@ class NoisyQAgent(Agent):
     noise_table: NoiseTable
     p: ModelParams = ModelParams()
     _index: Callable = indexer_slots
-    exp_buffer: ExperienceBuffer = field(default_factory=list)
+    exp_buffer: ExperienceBuffer = field(default_factory=list, repr=False)
 
     def act(self, state: State):
         # fetch index
