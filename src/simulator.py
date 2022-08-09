@@ -34,7 +34,7 @@ class Simulator:
     agent: NoisyQAgent
     env: Environment
 
-    def run_episode(self) -> Reward:
+    def run_episode(self, learning=True) -> Reward:
         # Initializing some variables
         tot_reward = 0
         done = False
@@ -43,17 +43,22 @@ class Simulator:
         while not done:
             experience, done = act_and_step(self.agent, self.env, state)
             self.agent.observe(experience)
-            self.agent.update_values(experience)
+            if learning:
+                self.agent.update_values(experience)
 
             # Update state and total reward obtained
             state = experience["next_state"]
             tot_reward += experience["reward"]
 
         # allocate resources
-        self.agent.allocate_memory_resources()
+        if learning:
+            self.agent.allocate_memory_resources()
 
         return tot_reward
 
     def train_agent(self) -> None:
-        for _ in range(self.env.n_episodes):  # pylint: disable=no-member
-            self.run_episode()
+        for i in range(self.env.n_episodes):  # pylint: disable=no-member
+            learning = True
+            if i > self.env.n_episodes / 2:  # pylint: disable=no-member
+                learning = False
+            self.run_episode(learning)
