@@ -55,15 +55,15 @@ def indexer_slots(state: State = None, action: Action = None):
 class ModelParams:
     sigma_base: float = 5
     gamma: float = 1
-    beta: float = 1
-    lmda: float = 0.1
+    beta: float = 10
+    lmda: float = 0.075
     lr: float = 0.1
     n_trajectories: int = 10
 
 
 @dataclass
 class SlotTaskParams:
-    delta: float = 1
+    delta: float = 0.75
     sigma: float = 5
     rel_freq: float = 3
     rel_diff: float = 3
