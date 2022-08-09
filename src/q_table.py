@@ -38,6 +38,7 @@ class QTable:
         # update values
         if target != 0:
             self.values[idx_sa] += self.p.lr * delta
+        self.values[:4] = 0
 
 
 class NoiseTable(ABC):
@@ -83,7 +84,7 @@ class NoiseTable(ABC):
 class NoiseTableDRA(NoiseTable):
     def __init__(self, size: int, p: ModelParams, norm):
         self.p = p
-        self.values = self.p.sigma_base * np.ones(size)
+        self.values = np.ones(size)
         self.norm = norm
 
     def _initialize_grad(self):
@@ -105,7 +106,7 @@ class NoiseTableDRA(NoiseTable):
 class NoiseTableScalar(NoiseTable):
     def __init__(self, size: int, p: ModelParams, norm):
         self.p = p
-        self.values = self.p.sigma_base * np.ones(size)
+        self.values = np.ones(size)
         self.sigma_scalar = 1
         self.sigma_history = []
         self.norm = norm
