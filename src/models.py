@@ -4,9 +4,9 @@ from typing import Callable, Protocol, Type, Union
 
 import numpy as np
 
-from customtypes import Action, Experience, ExperienceBuffer, ModelName, State
-from q_table import NoiseTable, NoiseTableDRA, NoiseTableScalar, QTable
-from utils import ModelParams, indexer_slots
+from .customtypes import Action, Experience, ExperienceBuffer, ModelName, State
+from .q_table import NoiseTable, NoiseTableDRA, NoiseTableScalar, QTable
+from .utils import ModelParams, indexer_slots
 
 
 class Agent(ABC):

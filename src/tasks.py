@@ -4,8 +4,8 @@ from typing import Tuple
 
 import numpy as np
 
-from customtypes import Action, Done, Info, Reward, State
-from utils import SlotTaskParams, option_choice_set_2afc, option_choice_set_slots
+from .customtypes import Action, Done, Info, Reward, State
+from .utils import SlotTaskParams, option_choice_set_2afc, option_choice_set_slots
 
 
 class Environment(ABC):
@@ -36,7 +36,7 @@ class SlotMachines(Environment):
 
     n_states: int = 8 + 1
     n_actions: int = 2
-    n_blocks: int = 10
+    n_blocks: int = 100
     n_repeats_per_block: int = 3
     p: SlotTaskParams = SlotTaskParams()
 

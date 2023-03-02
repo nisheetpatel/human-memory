@@ -8,10 +8,10 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
 
-from models import DRA, EqualRA, FreqRA, StakesRA
-from simulator import Simulator
-from tasks import SlotMachines
-from utils import ModelParams, SlotTaskParams
+from .models import DRA, EqualRA, FreqRA, StakesRA
+from .simulator import Simulator
+from .tasks import SlotMachines
+from .utils import ModelParams, SlotTaskParams
 
 
 def train(simulator: Simulator):
@@ -62,7 +62,7 @@ class Experiment:
     def _extract_data_single_run(self, simulator: Simulator) -> pd.DataFrame:
         data = simulator.agent.exp_buffer
         assert len(data) > 0, "Cannot extract data before running the experiment."
-        data = data[-2 * 192 :]
+        data = data[-10 * 192 :]
         return self._preprocess_data(pd.DataFrame(data))
 
     @staticmethod
@@ -102,7 +102,7 @@ def main():
     df_values["Slot machine"] = df_values["option"] + 1
     df_values = df_values.loc[df_values["Slot machine"] <= 4]
 
-    sns.set()
+    sns.set(font_scale=2)
     fig = sns.relplot(
         data=df_choice,
         x="Difficulty",
@@ -114,11 +114,11 @@ def main():
         palette=sns.color_palette(n_colors=4),
     )
     fig.set(xticks=df_choice["Difficulty"].unique())
-    plt.show()
-    # plt.savefig("./figures/slot-machines/model-predictions_fixed-value.png")
-    # plt.close()
+    # plt.show()
+    plt.savefig("./figures/slot-machines/model-predictions.svg")
+    plt.close()
 
-    sns.set()
+    sns.set(font_scale=2)
     fig_2 = sns.lineplot(
         data=df_values,
         x="Slot machine",
@@ -127,9 +127,9 @@ def main():
         palette=sns.color_palette(n_colors=4),
     )
     fig_2.set(xticks=df_values["Slot machine"].unique())
-    plt.show()
-    # plt.savefig("./figures/slot-machines/true-noise_fixed-value.png")
-    # plt.close()
+    # plt.show()
+    plt.savefig("./figures/slot-machines/true-noise.svg")
+    plt.close()
 
 
 if __name__ == "__main__":

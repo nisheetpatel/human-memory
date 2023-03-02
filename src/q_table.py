@@ -3,8 +3,8 @@ from typing import Union
 
 import numpy as np
 
-from customtypes import Experience, ExperienceBuffer
-from utils import ModelParams, indexer_slots
+from .customtypes import Experience, ExperienceBuffer
+from .utils import ModelParams, indexer_slots
 
 
 def get_indices(experience: Experience) -> tuple:

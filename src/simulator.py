@@ -1,8 +1,8 @@
 from dataclasses import dataclass
 
-from customtypes import Done, Experience, Reward, State
-from models import Agent, NoisyQAgent
-from tasks import Environment
+from .customtypes import Done, Experience, Reward, State
+from .models import Agent, NoisyQAgent
+from .tasks import Environment
 
 
 def act_and_step(
@@ -59,6 +59,6 @@ class Simulator:
     def train_agent(self) -> None:
         for i in range(self.env.n_episodes):  # pylint: disable=no-member
             learning = True
-            if i > self.env.n_episodes - 2 * 192:  # pylint: disable=no-member
+            if i > self.env.n_episodes - 10 * 192:  # pylint: disable=no-member
                 learning = False
             self.run_episode(learning)

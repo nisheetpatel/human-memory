@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from customtypes import Action, State
+from .customtypes import Action, State
 
 
 @dataclass
@@ -57,7 +57,7 @@ class ModelParams:
     gamma: float = 1
     beta: float = 10
     lmda: float = 0.075
-    lr: float = 0.1
+    lr: float = 0.01
     n_trajectories: int = 10
 
 
