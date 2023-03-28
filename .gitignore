@@ -8,10 +8,15 @@ __pycache__
 figures/
 data/
 
+# data files
+*.npz
+*.npy
+*.pkl
+*.csv
 
 # Environment folders
-env/
-venv/
+*env/
+*venv/
 
 
 # Python workbench files
