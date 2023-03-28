@@ -1,7 +1,18 @@
 import os
 from dataclasses import dataclass
 
+import dateutil.parser
 import pandas as pd
+
+
+def get_file_date(file: str) -> str:
+    return file.split("_")[3]
+
+
+def check_if_date_greater_than(date: str, ref_date: str) -> list:
+    date = dateutil.parser.parse(date)
+    ref_date = dateutil.parser.parse(ref_date)
+    return date > ref_date
 
 
 def get_all_csv_files(path: str, min_size_bytes=10_000) -> list:
@@ -57,8 +68,8 @@ def extract_data_partition(df: pd.DataFrame, cols: list, filter_col=1) -> pd.Dat
     return df.loc[~df.loc[:, cols[filter_col]].isnull(), cols].reset_index(drop=True)
 
 
-def add_block_id(df: pd.DataFrame, n_blocks: int = 4) -> pd.DataFrame:
-    df["block_id"] = [int(i // (len(df) / n_blocks)) for i in range(len(df))]
+def add_block_id(df: pd.DataFrame, block_len: int = 192) -> pd.DataFrame:
+    df["block_id"] = [int(i // (block_len)) for i in range(len(df))]
     df["block_type"] = ["training" if i == 0 else "test" for i in df["block_id"]]
     return df
 
@@ -75,20 +86,19 @@ def add_response(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def check_length(df: pd.DataFrame) -> bool:
-    if len(df) != 192 * 4:
+    if len(df) < 192 * 2:
         # raise ValueError("Dataframe is not of the correct length.")
         return False
     return True
 
 
 def print_trial_splits(df: pd.DataFrame) -> None:
-    foo = (
+    print(
         df.groupby(["Slot Machine ID", "slot_machine_image"])[
             "Difficulty"
         ].value_counts()
         / 4
     )
-    print(foo)
 
 
 def get_dataframes(csv_files: list, path: str) -> tuple[pd.DataFrame, pd.DataFrame]:
