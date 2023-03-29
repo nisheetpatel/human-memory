@@ -1,3 +1,5 @@
+from dataclasses import dataclass, field
+
 import pandas as pd
 
 from analysis.process import load_choice_data
@@ -10,7 +12,7 @@ def load_pilot_v3_data() -> pd.DataFrame:
     return pd.concat([df_3, df_3a], ignore_index=True)
 
 
-class DataFilterer:
+class DataProcessor:
     """Process the data and add performance scores it for analysis."""
 
     def __init__(self, df: pd.DataFrame = None) -> None:
@@ -76,10 +78,34 @@ class DataFilterer:
         return df.reset_index()
 
 
-def main() -> pd.DataFrame:
-    """Compute performance metrics to be returned as a dataframe."""
-    df = load_pilot_v3_data()
-    return DataFilterer(df).performance_metrics
+@dataclass
+class DataFilterer:
+    data_processor = DataProcessor()
+
+    def get_performance_metrics(self) -> pd.DataFrame:
+        """Compute performance metrics to be returned as a dataframe."""
+        return self.data_processor.performance_metrics
+
+    @property
+    def good_subjects_ids(self) -> pd.Series:
+        return self.get_performance_metrics().query("above_chance == True")[
+            "participant_id"
+        ]
+
+    def get_good_subjects_data(self) -> pd.DataFrame:
+        """Get data for subjects who perform above chance level."""
+        df = self.data_processor.df
+        return df.loc[df["participant_id"].isin(self.good_subjects_ids)].copy()
+
+    def get_bad_subjects_data(self) -> pd.DataFrame:
+        """Get data for subjects who perform at or below chance level."""
+        df = self.data_processor.df
+        return df.loc[~df["participant_id"].isin(self.good_subjects_ids)].copy()
+
+
+def main() -> DataFilterer:
+    """Compute performance metrics and return a DataFilterer object."""
+    return DataFilterer()
 
 
 if __name__ == "__main__":
