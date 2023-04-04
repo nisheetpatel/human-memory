@@ -67,7 +67,7 @@ class DataProcessor:
 
     def get_null_distribution(self, n_shuffles: int = 100) -> pd.Series:
         """Compute the null distribution of performance scores."""
-        print("Computing null distribution by shuffling data...")
+        print("Computing null distribution...")
         df = self.df.copy()
         performance_scores = []
         for _ in range(n_shuffles):
@@ -91,6 +91,8 @@ class DataProcessor:
 
 @dataclass
 class DataFilterer:
+    """Filter the data based on subjects' performance."""
+
     data_processor = DataProcessor()
 
     def get_performance_metrics(self) -> pd.DataFrame:
