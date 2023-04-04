@@ -4,6 +4,8 @@ import numpy as np
 import pandas as pd
 import stan
 
+from analysis import stan_models
+
 
 def clean_data(data: pd.DataFrame, test_only=True) -> pd.DataFrame:
     """Clean data for Stan."""
@@ -42,115 +44,10 @@ def get_choice_data_dict(data: pd.DataFrame, id_map: dict) -> dict:
     }
 
 
-############################################################
-# STAN MODELS
-############################################################
-
-LOGIT_DIFF_BIAS = """
-    data {
-        int<lower=1> N; // number of training samples
-        int<lower=0> K; // number of predictors (4 SMs)
-        int<lower=1> L; // number of subjects
-        
-        int<lower=1, upper=L> ll[N]; // subject id {1,...,L}
-        row_vector<lower=0, upper=1>[K] ss[N]; // slot machine id indicator
-
-        row_vector[K] X[N];         // predictors
-        int<lower=0, upper=1> y[N]; // response
-    }
-
-    parameters {
-        vector[K] beta[L];  // individual slope
-        vector[K] mu_beta;  // Hierarchical mean for slope
-        vector<lower=0>[K] sigma_beta; // h std for slope
-        
-        vector[K] alpha[L]; // individual intercept
-        vector[K] mu_alpha;   // Hierarchical mean for intercept
-        vector<lower=0>[K] sigma_alpha; // h std for intercept
-
-        vector[L] alpha_0; // common intercept
-        real mu_alpha_0;   // hierarchical mean for common intercept
-        real<lower=0> sigma_alpha_0; // h std for common intercept
-    }
-
-    model {
-        mu_beta ~ normal(0.25, 2);
-        sigma_beta ~ cauchy(0, 1);
-            
-        mu_alpha ~ normal(0, 0.5);
-        sigma_alpha ~ cauchy(0, 0.5);
-        
-        mu_alpha_0 ~ normal(0, 0.5);
-        sigma_alpha_0 ~ cauchy(0, 0.5);
-
-        for (l in 1:L) {
-            beta[l] ~ normal(mu_beta, sigma_beta);
-            alpha[l] ~ normal(mu_alpha, sigma_alpha);
-            alpha_0[l] ~ normal(mu_alpha_0, sigma_alpha_0);
-        }
-        
-        {
-        vector[N] x_beta_ll;
-
-        for (n in 1:N)
-            x_beta_ll[n] = X[n] * beta[ll[n]] + ss[n] * alpha[ll[n]] + alpha_0[ll[n]];
-        
-        y ~ bernoulli_logit(x_beta_ll);
-        }
-    }
-"""
-
-LOGIT_COMMON_BIAS = """
-    data {
-        int<lower=1> N; // number of training samples
-        int<lower=0> K; // number of predictors (4 SMs)
-        int<lower=1> L; // number of subjects
-        
-        int<lower=1, upper=L> ll[N]; // subject id {1,...,L}
-        row_vector<lower=0, upper=1>[K] ss[N]; // slot machine id indicator
-
-        row_vector[K] X[N];         // predictors
-        int<lower=0, upper=1> y[N]; // response
-    }
-
-    parameters {
-        vector[K] beta[L];  // individual slope
-        vector[K] mu_beta;  // Hierarchical mean for slope
-        vector<lower=0>[K] sigma_beta; // h std for slope
-
-        vector[L] alpha_0; // common intercept
-        real mu_alpha_0;   // hierarchical mean for common intercept
-        real<lower=0> sigma_alpha_0; // h std for common intercept
-    }
-
-    model {
-        mu_beta ~ normal(0.25, 2);
-        sigma_beta ~ cauchy(0, 1);
-        
-        mu_alpha_0 ~ normal(0, 0.25);
-        sigma_alpha_0 ~ cauchy(0, 0.5);
-
-        for (l in 1:L) {
-            beta[l] ~ normal(mu_beta, sigma_beta);
-            alpha_0[l] ~ normal(mu_alpha_0, sigma_alpha_0);
-        }
-        
-        {
-        vector[N] x_beta_ll;
-
-        for (n in 1:N)
-            x_beta_ll[n] = X[n] * beta[ll[n]] + alpha_0[ll[n]];
-        
-        y ~ bernoulli_logit(x_beta_ll);
-        }
-    }
-"""
-
-
 class HierarchicalModel:
     """Hierarchical model for choice data."""
 
-    def __init__(self, model: str = LOGIT_DIFF_BIAS):
+    def __init__(self, model: str = stan_models.LOGIT_DIFF_BIAS):
         self.model = model
         self.id_map = None
 
@@ -178,3 +75,56 @@ class HierarchicalModel:
 
         with open(filename, "rb") as file:
             return pickle.load(file)["fit"]
+
+
+def test_model_signatures(betas: np.ndarray, e_factor=1, th_factor=0) -> np.ndarray:
+    """
+    Test percentage of samples from the posterior over betas that
+    pass the test for all models in customtype.ModelName.
+    """
+
+    stdev = np.median(np.std(betas, axis=1))
+    th = stdev * th_factor
+    e = stdev * e_factor
+
+    dra = (
+        (betas[0] - betas[1] > th)
+        * (betas[0] - betas[2] > th)
+        * (betas[0] - betas[3] > th)
+        * (betas[1] - betas[3] > th)
+        * (betas[2] - betas[3] > th)
+    )
+    freq = (
+        (abs(betas[0] - betas[1]) < e)
+        * (abs(betas[2] - betas[3]) < e)
+        * ((betas[0] - betas[2]) > th)
+        * ((betas[0] - betas[3]) > th)
+        * ((betas[1] - betas[2]) > th)
+        * ((betas[1] - betas[3]) > th)
+    )
+    stakes = (
+        (abs(betas[0] - betas[2]) < e)
+        * (abs(betas[1] - betas[3]) < e)
+        * ((betas[0] - betas[1]) > th)
+        * ((betas[0] - betas[3]) > th)
+        * ((betas[2] - betas[1]) > th)
+        * ((betas[2] - betas[3]) > th)
+    )
+    ep = (
+        (abs(betas[0] - betas[1]) < e)
+        * (abs(betas[0] - betas[2]) < e)
+        * (abs(betas[0] - betas[3]) < e)
+        * (abs(betas[1] - betas[2]) < e)
+        * (abs(betas[1] - betas[3]) < e)
+        * (abs(betas[2] - betas[3]) < e)
+    )
+    dra2 = (
+        (betas[0] - betas[3] > th)
+        * (betas[0] - betas[1] > -e)
+        * (betas[0] - betas[2] > -e)
+        * (betas[1] - betas[3] > -e)
+        * (betas[2] - betas[3] > -e)
+        * np.logical_not(freq + stakes + ep)
+    )
+
+    return [lambda x: 100 * np.sum(x) / len(x) for x in [dra, dra2, freq, stakes, ep]]
