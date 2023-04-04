@@ -141,7 +141,7 @@ def load_all_data(path: str) -> None:
     df_data, df_instr = get_dataframes(csv_files, path=path)
 
     participant_ids = df_data["participant_id"].unique()
-    id_map = {id: i for i, id in enumerate(participant_ids)}
+    id_map = {id: i + 1 for i, id in enumerate(participant_ids)}
 
     for df in [df_data, df_instr]:
         df["participant_id"] = df["participant_id"].map(id_map)
