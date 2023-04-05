@@ -1,0 +1,203 @@
+import os
+from dataclasses import dataclass
+
+import dateutil.parser
+import numpy as np
+import pandas as pd
+
+
+@dataclass
+class CleanerRaw:
+    """Clean the raw data folder to get rid of useless files."""
+
+    path: str
+    ref_date: str = "2000-01-01"
+    min_size_bytes: int = 10_000
+
+    def __post_init__(self):
+        self.csv_files = [
+            file for file in os.listdir(self.path) if file.endswith(".csv")
+        ]
+
+    def get_date(self, file: str) -> str:
+        try:
+            return file.split("_")[3]
+        except dateutil.parser.ParserError:
+            print(f"Warning: could not parse date from {file}; removed.")
+            return self.ref_date
+
+    @staticmethod
+    def check_date_less_than(date: str, ref_date: str) -> list:
+        date = dateutil.parser.parse(date)
+        ref_date = dateutil.parser.parse(ref_date)
+        return date < ref_date
+
+    def is_not_csv(self, file: str) -> bool:
+        return file not in self.csv_files
+
+    def is_old(self, file: str) -> bool:
+        return self.check_date_less_than(self.get_date(file), self.ref_date)
+
+    def is_small(self, file: str) -> bool:
+        return os.path.getsize(self.path + file) < self.min_size_bytes
+
+    def clean(self) -> None:
+        counter = 0
+        for file in os.listdir(self.path):
+            if self.is_not_csv(file) or self.is_old(file) or self.is_small(file):
+                os.remove(self.path + file)
+                print(f"Removed {file}.")
+                counter += 1
+
+        print(f"\nCleaned {self.path}:")
+        print(f"Removed {counter} files. {len(os.listdir(self.path))} remain.\n")
+
+
+@dataclass
+class Columns:
+    instructions = [
+        "participant_id",
+        "key_resp_instructions.keys",
+        "key_resp_instructions.rt",
+    ]
+    data = [
+        "participant_id",
+        "state",
+        "slot_machine_id",
+        "slot_machine_image",
+        "slot_machine_mean_payoff",
+        "price",
+        "correct_response",
+        "key_resp.keys",
+        "key_resp.corr",
+        "reward_drawn",
+        "bonus_payout",
+        "trials.thisN",
+        "key_resp.rt",
+    ]
+
+
+class Processor:
+    """Processes raw data into a clean format for analysis."""
+
+    def __init__(self, path: str):
+        self.path = path
+        self.cols = Columns.data
+        self.block_len = 192
+        self.difficulty_map = {0: 2, 1: 1, 2: -1, 3: -2}
+        self.response_map = {"left": 1, "right": 0}
+
+    def extract_data_partition(self, df: pd.DataFrame, filter_col=1) -> pd.DataFrame:
+        """Extracts non-empty data given list of columns."""
+        return df.loc[
+            ~df.loc[:, self.cols[filter_col]].isnull(), self.cols
+        ].reset_index(drop=True)
+
+    @staticmethod
+    def rename_columns(df: pd.DataFrame) -> pd.DataFrame:
+        """Renames columns to be more readable."""
+        return df.rename(
+            columns={
+                "key_resp.corr": "Choice Accuracy",
+                "key_resp.rt": "Response Time",
+                "slot_machine_id": "Slot Machine ID",
+            },
+        )
+
+    def add_block_id(self, df: pd.DataFrame) -> pd.DataFrame:
+        df["block_id"] = [int(i // (self.block_len)) for i in range(len(df))]
+        df["block_type"] = ["training" if i == 0 else "test" for i in df["block_id"]]
+        return df
+
+    def add_difficulty(self, df: pd.DataFrame) -> pd.DataFrame:
+        df["Difficulty"] = df["state"] % 4
+        df["Difficulty"].replace(self.difficulty_map, inplace=True)
+        return df
+
+    def add_response(self, df: pd.DataFrame) -> pd.DataFrame:
+        df["Response"] = df["key_resp.keys"].replace(self.response_map)
+        return df
+
+    @staticmethod
+    def compute_expected_reward(df: pd.DataFrame) -> None:
+        expected_reward_if_yes = df["slot_machine_mean_payoff"] - df["price"]
+        df["expected_reward_if_correct"] = expected_reward_if_yes.clip(lower=0)
+        df["expected_reward"] = expected_reward_if_yes * df["Response"]
+        return df
+
+    @staticmethod
+    def compute_accuracy(df: pd.DataFrame) -> pd.Series:
+        return (df.groupby("participant_id")["Choice Accuracy"].mean() * 100).copy()
+
+    @staticmethod
+    def compute_performance(df: pd.DataFrame) -> pd.Series:
+        max_expected_reward = (
+            df.groupby(["participant_id"])["expected_reward_if_correct"]
+            .mean()
+            .unique()[0]
+        )
+
+        return (
+            df[df["block_type"] == "test"]
+            .groupby("participant_id")["expected_reward"]
+            .mean()
+            / max_expected_reward
+            * 100
+        ).copy()
+
+    @staticmethod
+    def shuffle_responses(df: pd.Series) -> pd.Series:
+        """Shuffle the responses."""
+        return df["Response"].sample(frac=1).reset_index(drop=True)
+
+    @staticmethod
+    def generate_random_responses(df: pd.Series) -> pd.Series:
+        """Responses generated by a random agent."""
+        return np.random.choice([0, 1], size=len(df))
+
+    def get_null_distribution(self, df: pd.DataFrame, n: int = 100) -> pd.Series:
+        """Compute the null distribution of performance scores."""
+        print("Computing null distribution...")
+        df = df.copy()
+        performance_scores = []
+        for _ in range(n):
+            df["Response"] = self.generate_random_responses(df["Response"])
+            df = self.compute_expected_reward(df)
+            performance_scores.append(self.compute_performance(df))
+        return pd.concat(performance_scores).sort_values()
+
+    def get_performance_threshold(
+        self, df: pd.DataFrame, quantile_threshold=0.95
+    ) -> pd.DataFrame:
+        """Filter the data by performance score above quantile_threshold."""
+        return self.get_null_distribution(df).quantile(quantile_threshold)
+
+    def compute_performance_metrics(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Compute the performance metrics for participants."""
+        perf = self.compute_performance(df).to_frame(name="performance")
+        perf["accuracy"] = self.compute_accuracy(df)
+        perf["above_chance"] = perf["performance"] > self.get_performance_threshold(df)
+        perf.sort_values("performance", ascending=False, inplace=True)
+        return perf.reset_index()
+
+    def run(self) -> pd.DataFrame:
+        """Processes the raw data into a clean format for analysis."""
+        files = os.listdir(self.path)
+        dfs = []
+
+        for file in files:
+            df = pd.read_csv(self.path + file)
+            df = (
+                df.pipe(self.extract_data_partition)
+                .pipe(self.rename_columns)
+                .pipe(self.add_block_id)
+                .pipe(self.add_difficulty)
+                .pipe(self.add_response)
+                .pipe(self.compute_expected_reward)
+            )
+            df["participant_id"] = df["participant_id"].astype(str)
+            dfs.append(df)
+
+        # need to sort by performance and assign participant_id
+
+        return pd.concat(dfs).reset_index(drop=True)
