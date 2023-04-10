@@ -20,17 +20,17 @@ def clean_data(data: pd.DataFrame, test_only=True) -> pd.DataFrame:
     if test_only:
         data = data.loc[data["block_type"] == "test"]
 
-    data = data.loc[:, ["participant_id", "Response", "X1", "X2", "X3", "X4"]]
+    data = data.loc[:, ["id", "Response", "X1", "X2", "X3", "X4"]]
 
     return data
 
 
-def get_choice_data_dict(data: pd.DataFrame, id_map: dict) -> dict:
+def get_choice_data_dict(data: pd.DataFrame) -> dict:
     """Get choice data dict to be fed into stan."""
 
     y = data["Response"].astype(int)
     X = data.loc[:, data.columns.isin(["X1", "X2", "X3", "X4"])]
-    p_id = data["participant_id"].map(id_map)
+    p_id = data["id"]
 
     return {
         "N": X.shape[0],  # number of training samples
@@ -48,14 +48,11 @@ class HierarchicalModel:
 
     def __init__(self, model: str = stan_models.LOGIT_DIFF_BIAS):
         self.model = model
-        self.id_map = None
 
     def get_choice_data_dict(self, data: pd.DataFrame) -> dict:
         """Return choice data dict to be fed into stan."""
 
-        data = clean_data(data)
-        self.id_map = {j: i + 1 for i, j in enumerate(data["participant_id"].unique())}
-        return get_choice_data_dict(data, self.id_map)
+        return get_choice_data_dict(clean_data(data))
 
     def fit_posterior(self, data: dict, n_chains=4, n_samples=10_000) -> stan.fit.Fit:
         """Build stan model and sample from posterior."""
