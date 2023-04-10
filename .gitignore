@@ -7,11 +7,17 @@ __pycache__
 # local folders
 figures/
 data/
+models/
 
+# data files
+*.npz
+*.npy
+*.pkl
+*.csv
 
 # Environment folders
-env/
-venv/
+*env/
+*venv/
 
 
 # Python workbench files

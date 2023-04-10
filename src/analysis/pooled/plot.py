@@ -142,13 +142,13 @@ def plot_all_block_figures(df: pd.DataFrame) -> None:
 if __name__ == "__main__":
     import os
 
-    from .process import main as load_data
+    from analysis.process import load_choice_data
 
-    if os.path.exists("../../data/"):
-        df_data, _ = load_data("../../data/pilot_slot-machines_3a/")
+    if os.path.exists("../data/"):
+        df_data = load_choice_data("../data/pilot_slot-machines_3a/")
 
         plot_test_block_figures(df_data)
         plot_all_block_figures(df_data)
 
     else:
-        print("No data found. Are you in the root directory?")
+        print("No data found. Try running the script from src")
