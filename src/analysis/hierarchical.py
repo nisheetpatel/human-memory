@@ -12,7 +12,6 @@ def clean_data(data: pd.DataFrame, test_only=True) -> pd.DataFrame:
 
     data = data.copy()
     data.dropna(inplace=True)
-    data["Slot Machine ID"] = (data["Slot Machine ID"] + 1).astype(int)
     data["Response"] = data["Response"].astype(int)
 
     for i in range(1, 5):
