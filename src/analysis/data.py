@@ -186,6 +186,7 @@ class Processor:
         return perf.reset_index()
 
     def _add_performance_metrics_to_data(self, df: pd.DataFrame) -> pd.DataFrame:
+        print("Computing and adding performance metrics to data...")
         perf = self._compute_performance_metrics(df)
 
         id_map = {k: v + 1 for k, v in zip(perf["participant_id"], perf.index)}
@@ -210,6 +211,8 @@ class Processor:
         files = os.listdir(self.path)
         dfs = []
 
+        print("Reading and processing raw data files...")
+
         for file in files:
             df = pd.read_csv(f"{self.path}{file}")
             df = (
@@ -228,3 +231,13 @@ class Processor:
         return df.pipe(self._convert_object_cols_to_categorical).pipe(
             self._sort_by_performance
         )
+
+    def extract_performance_metrics(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Returns performance metrics for the processed data."""
+        if "performance" not in df.columns:
+            raise ValueError("Can only return performance metrics for processed data")
+
+        perf = df.groupby("id")[["performance", "accuracy", "above_chance"]].mean()
+        perf["above_chance"] = perf["above_chance"].astype(bool)
+
+        return perf.reset_index()
