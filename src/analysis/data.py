@@ -117,6 +117,7 @@ class Processor:
         df["Response"] = df["key_resp.keys"].replace(self.response_map)
         return df
 
+    @staticmethod
     def _update_slot_machine_ids(df: pd.DataFrame) -> pd.DataFrame:
         df["Slot Machine ID"] = (df["Slot Machine ID"] + 1).astype(int)
         return df
