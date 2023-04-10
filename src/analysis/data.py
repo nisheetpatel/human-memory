@@ -117,6 +117,10 @@ class Processor:
         df["Response"] = df["key_resp.keys"].replace(self.response_map)
         return df
 
+    def _update_slot_machine_ids(df: pd.DataFrame) -> pd.DataFrame:
+        df["Slot Machine ID"] = (df["Slot Machine ID"] + 1).astype(int)
+        return df
+
     @staticmethod
     def _convert_object_cols_to_categorical(df: pd.DataFrame) -> pd.DataFrame:
         string_cols = df.select_dtypes(include="object").columns
@@ -221,6 +225,7 @@ class Processor:
                 .pipe(self._add_block_id)
                 .pipe(self._add_difficulty)
                 .pipe(self._add_response)
+                .pipe(self._update_slot_machine_ids)
                 .pipe(self._compute_expected_reward)
             )
 
