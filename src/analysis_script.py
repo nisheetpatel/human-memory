@@ -1,5 +1,6 @@
 from analysis.data import Processor as DataProcessor
 from analysis.hierarchical import Classifier, HierarchicalModel, Plotter
+from analysis.psytrack import PsytrackModel
 
 # set data and model paths
 DATA_PATH = "../data/pilot_slot-machines_3/"
@@ -48,3 +49,9 @@ for i, (df, model_name) in enumerate(zip(dfs, model_names)):
     fit = model.fit_posterior(choice_data_dict, **hierarchical_model_params)
     fits.append(fit)
     model.save(fit, f"{MODEL_PATH}{model_name}.pkl")
+
+# psytrack fits
+test_subj_id = 2
+psytrack_model = PsytrackModel()
+psytrack_model.fit(df.loc[df["id"] == test_subj_id])
+psytrack_model.plot_weights()
