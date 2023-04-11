@@ -73,7 +73,7 @@ class HierarchicalModel:
             return pickle.load(file)["fit"]
 
 
-def test_model_signatures(betas: np.ndarray, e_factor=1, th_factor=0) -> np.ndarray:
+def test_model_signatures(betas: np.ndarray, e_factor=1.7, th_factor=0) -> np.ndarray:
     """
     Test percentage of samples from the posterior over betas that
     pass the test for all models in customtype.ModelName.
@@ -123,4 +123,29 @@ def test_model_signatures(betas: np.ndarray, e_factor=1, th_factor=0) -> np.ndar
         * np.logical_not(freq + stakes + ep)
     )
 
-    return [lambda x: 100 * np.sum(x) / len(x) for x in [dra, dra2, freq, stakes, ep]]
+    return [100 * np.sum(x) / len(x) for x in [dra, dra2, freq, stakes, ep]]
+
+
+class Classifier:
+    def __init__(self, fit: stan.fit.Fit, equality_thresh: float = 1.7) -> None:
+        self.samples = fit["beta"]
+        self.equality_thresh = equality_thresh
+        self.perf_metrics = pd.DataFrame(
+            columns=["DRAx", "DRA+", "Freq", "Stakes", "EP", "class"]
+        )
+        self.class_map = {0: "DRA", 1: "DRA", 2: "Freq", 3: "Stakes", 4: "EP", 5: None}
+
+    def classify(self):
+        for i, beta in enumerate(self.samples):
+            model_signatures = test_model_signatures(beta, self.equality_thresh) + [10]
+            model_class = self.class_map[np.argmax(model_signatures)]
+            self.perf_metrics.loc[i] = model_signatures[:-1] + [model_class]
+        return self.perf_metrics
+
+    def merge_with_performance_metrics(self, df: pd.DataFrame) -> pd.DataFrame:
+        return self.perf_metrics.merge(df, left_index=True, right_index=True)
+
+    def get_ids(self, model: str) -> list:
+        return list(
+            self.perf_metrics.loc[self.perf_metrics["class"] == model].index + 1
+        )
