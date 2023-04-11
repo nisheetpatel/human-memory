@@ -6,6 +6,8 @@ import pandas as pd
 import psytrack
 from matplotlib import pyplot as plt
 
+from analysis.hierarchical import clean_data
+
 
 class PsytrackModel:
     def __init__(self) -> None:
@@ -25,6 +27,8 @@ class PsytrackModel:
     @staticmethod
     def _organize_data(data: pd.DataFrame) -> dict:
         """Organize data for psytrack."""
+        if "X1" not in data.columns:
+            data = clean_data(data, test_only=False)
         return {
             "inputs": {
                 "x1": np.asarray(data["X1"]).reshape(-1, 1),
@@ -40,14 +44,14 @@ class PsytrackModel:
 
         print("Fitting psytrack model...")
         start = timer()
-
+        data_dict = self._organize_data(data)
         (
             self.hyperparams,
             self.evidence,
             self.w_mode,
             self.hess_info,
         ) = psytrack.hyperOpt(
-            data, self._hyperparams, self.weights, self.opt_list, jump=jump
+            data_dict, self._hyperparams, self.weights, self.opt_list, jump=jump
         )
 
         print(f"Done in {timer() - start:.2f} seconds.\n")
