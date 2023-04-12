@@ -4,9 +4,9 @@ from typing import Callable, Protocol, Type, Union
 
 import numpy as np
 
-from .customtypes import Action, Experience, ExperienceBuffer, ModelName, State
-from .q_table import NoiseTable, NoiseTableDRA, NoiseTableScalar, QTable
-from .utils import ModelParams, indexer_slots
+from definitions import Action, Experience, ExperienceBuffer, ModelName, State
+from model.q_table import NoiseTable, NoiseTableDRA, NoiseTableScalar, QTable
+from model.utils import ModelParams, indexer_slots
 
 
 class Agent(ABC):
@@ -135,7 +135,3 @@ class EqualRA:
     def norm(self):
         norm_factor = np.ones(4)
         return 4 * norm_factor / np.sum(norm_factor[:4])
-
-
-if __name__ == "__main__":
-    print("This file is not meant to be run as a script.")

@@ -1,8 +1,8 @@
 from dataclasses import dataclass
 
-from .customtypes import Done, Experience, Reward, State
-from .models import Agent, NoisyQAgent
-from .tasks import Environment
+from definitions import Done, Experience, Reward, State
+from model.models import Agent, NoisyQAgent
+from model.tasks import Environment
 
 
 def act_and_step(
