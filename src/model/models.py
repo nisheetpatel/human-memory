@@ -36,12 +36,12 @@ class NoisyQAgent(Agent):
     q_table: QTable
     noise_table: NoiseTable
     p: ModelParams = ModelParams()
-    _index: Callable = indexer_slots
+    get_index: Callable = indexer_slots
     exp_buffer: ExperienceBuffer = field(default_factory=list, repr=False)
 
     def act(self, state: State):
         # fetch index
-        idx = self._index(state=state)
+        idx = self.get_index(state=state)
         n_actions = len(idx)
 
         # draw from noisy memory distribution and determine action probabilities
