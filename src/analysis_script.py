@@ -1,10 +1,6 @@
 from analysis.data import Processor as DataProcessor
 from analysis.hierarchical import Classifier, HierarchicalModel, Plotter
-
-# set data and model paths
-DATA_PATH = "../data/pilot_slot-machines_3/"
-MODEL_PATH = "../models/pilot_slot-machines_3/"
-FIGURE_PATH = "../figures/slot-machines/"
+from definitions import DATA_PATH, FIGURE_PATH, MODEL_PATH
 
 # set parameters for fitting hierarchical model
 hierarchical_model_params = {"n_chains": 4, "n_samples": 2_000}

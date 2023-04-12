@@ -8,10 +8,10 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
 
-from .models import DRA, EqualRA, FreqRA, StakesRA
-from .simulator import Simulator
-from .tasks import SlotMachines
-from .utils import ModelParams, SlotTaskParams
+from model.models import DRA, EqualRA, FreqRA, StakesRA
+from model.simulator import Simulator
+from model.tasks import SlotMachines
+from model.utils import ModelParams, SlotTaskParams
 
 
 def train(simulator: Simulator):
