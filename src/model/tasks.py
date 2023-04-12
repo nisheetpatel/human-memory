@@ -4,8 +4,8 @@ from typing import Tuple
 
 import numpy as np
 
-from .customtypes import Action, Done, Info, Reward, State
-from .utils import SlotTaskParams, option_choice_set_2afc, option_choice_set_slots
+from definitions import Action, Done, Info, Reward, State
+from model.utils import SlotTaskParams, option_choice_set_2afc, option_choice_set_slots
 
 
 class Environment(ABC):

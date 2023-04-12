@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from .customtypes import Action, State
+from definitions import Action, State
 
 
 @dataclass
