@@ -3,10 +3,10 @@ from dataclasses import dataclass, field
 from typing import Callable, Protocol, Type, Union
 
 import numpy as np
-
 from definitions import Action, Experience, ExperienceBuffer, ModelName, State
 from model.q_table import NoiseTable, NoiseTableDRA, NoiseTableScalar, QTable
 from model.utils import ModelParams, indexer_slots
+from scipy import stats
 
 
 class Agent(ABC):
@@ -54,6 +54,18 @@ class NoisyQAgent(Agent):
         action = np.random.choice(np.arange(n_actions), p=prob_actions)
 
         return action, prob_actions, zeta
+
+    def get_action_prob(self, state: State):
+        """Probability of choosing actions for a slot machine (task-specific)"""
+        # fetch index
+        idx = self.get_index(state=state)
+        
+        # define q, sigma for option
+        q, sigma = self.q_table.values[idx], self.noise_table.values[idx]
+        prob_yes = stats.norm(q[0], sigma[0]).cdf(q[1])
+
+        return (prob_yes, 1 - prob_yes)
+
 
     def observe(self, experience: Experience) -> None:
         if experience["state"] < 16:
