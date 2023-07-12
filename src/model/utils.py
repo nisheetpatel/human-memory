@@ -64,6 +64,6 @@ class ModelParams:
 @dataclass
 class SlotTaskParams:
     delta: float = 0.75
-    sigma: float = 5
+    sigma: float = 2
     rel_freq: float = 3
     rel_diff: float = 3
