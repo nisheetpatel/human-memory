@@ -14,8 +14,8 @@ class NoisyQLikelihoodComputer:
     def compute_log_likelihood(self, data: np.ndarray, model: NoisyQAgent) -> float:
         log_likelihood = 0.0
         for obs in data:
-            idx = model.get_index(state=obs[0])
-            prob_actions = model.prob_action(idx, obs[4])
+            # idx = model.get_index(state=obs[0])
+            prob_actions = model.get_action_prob(state=obs[0])
             log_likelihood += np.log(prob_actions[obs[1]])
 
         return log_likelihood
@@ -40,7 +40,7 @@ class LikelihoodCalculator:
                 action_idx,
                 _,  # prob_actions,
             ) = self.data[trial]
-            prob_action = self.model.act(state)[1][action_idx]
+            prob_action = self.model.get_action_prob(state)[action_idx]
             if action == 0:
                 log_likelihood += np.log(prob_action)
             else:
