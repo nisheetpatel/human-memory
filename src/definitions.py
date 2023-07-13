@@ -3,9 +3,9 @@ from enum import Enum
 from typing import TypedDict
 
 ROOT_DIR = os.path.dirname(os.path.abspath(os.path.join(__file__, os.pardir)))
-DATA_PATH = ROOT_DIR + "data/"
-MODEL_PATH = ROOT_DIR + "models/"
-FIGURE_PATH = ROOT_DIR + "figures/"
+DATA_PATH = os.path.join(ROOT_DIR, "data/")
+MODEL_PATH = os.path.join(ROOT_DIR, "models/")
+FIGURE_PATH = os.path.join(ROOT_DIR, "figures/")
 
 
 # custom type aliases
