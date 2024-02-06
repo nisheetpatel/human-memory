@@ -1,0 +1,28 @@
+# Cache files from python and linters
+__pycache__
+*.pyc
+.mypy_cache/
+
+
+# local folders
+figures/
+data/
+models/
+
+# data files
+*.npz
+*.npy
+*.pkl
+*.csv
+
+# Environment folders
+*env/
+*venv/
+
+
+# Python workbench files
+workbench*.py
+
+
+# stan build files
+build/
