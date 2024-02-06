@@ -20,8 +20,11 @@ scikit-learn = "^1.4.0"
 scipy = "^1.12.0"
 seaborn = "^0.13.2"
 statsmodels = "^0.14.1"
+pybads = "^1.0.3"
 
+[tool.poetry.scripts]
+your-script-name = "src.analysis_script:main"
 
 [build-system]
-requires = ["poetry-core"]
+requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"

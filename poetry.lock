@@ -255,6 +255,25 @@ pastel = ">=0.2.0,<0.3.0"
 pylev = ">=1.3,<2.0"
 
 [[package]]
+name = "cma"
+version = "3.3.0"
+description = "CMA-ES, Covariance Matrix Adaptation Evolution Strategy for non-linear numerical optimization in Python"
+category = "main"
+optional = false
+python-versions = "*"
+files = [
+    {file = "cma-3.3.0-py3-none-any.whl", hash = "sha256:5cc571b1e2068fcf1c538be36f8f3a870107456fed22ce81c1345a96329e61db"},
+    {file = "cma-3.3.0.tar.gz", hash = "sha256:b748b8e03f4e7ae816157d7b9bb2fc6b1fb2fee1d5fd3399329b646bb75861ec"},
+]
+
+[package.dependencies]
+numpy = "*"
+
+[package.extras]
+constrained-solution-tracking = ["moarchiving"]
+plotting = ["matplotlib"]
+
+[[package]]
 name = "colorama"
 version = "0.4.6"
 description = "Cross-platform colored terminal text."
@@ -554,6 +573,28 @@ files = [
 ]
 
 [[package]]
+name = "gpyreg"
+version = "1.0.2"
+description = "Lightweight package for Gaussian process regression."
+category = "main"
+optional = false
+python-versions = ">=3.9"
+files = [
+    {file = "GPyReg-1.0.2-py3-none-any.whl", hash = "sha256:43a457368af23463fb61575e501dffbfb4c1c960c32d380424b91560d1028822"},
+    {file = "GPyReg-1.0.2.tar.gz", hash = "sha256:89410e759fbe0e015fc3416f5e28bd53591815ca96fb3ab66aadc43b1dfb9457"},
+]
+
+[package.dependencies]
+matplotlib = ">=3.5.1"
+numpy = ">=1.22.1"
+pytest = ">=6.2.5"
+pytest-rerunfailures = ">=10.2"
+scipy = ">=1.7.3"
+
+[package.extras]
+dev = ["build (>=0.9.0)", "numpydoc (>=1.2.1)", "sphinx (>=4.3.2)", "sphinx-book-theme (>=0.2.0)"]
+
+[[package]]
 name = "httpstan"
 version = "4.11.0"
 description = "HTTP-based interface to Stan, a package for Bayesian inference."
@@ -589,6 +630,18 @@ python-versions = ">=3.5"
 files = [
     {file = "idna-3.6-py3-none-any.whl", hash = "sha256:c05567e9c24a6b9faaa835c4821bad0590fbb9d5779e7caa6e1cc4978e7eb24f"},
     {file = "idna-3.6.tar.gz", hash = "sha256:9ecdbbd083b06798ae1e86adcbfe8ab1479cf864e4ee30fe4e46a003d12491ca"},
+]
+
+[[package]]
+name = "iniconfig"
+version = "2.0.0"
+description = "brain-dead simple config-ini parsing"
+category = "main"
+optional = false
+python-versions = ">=3.7"
+files = [
+    {file = "iniconfig-2.0.0-py3-none-any.whl", hash = "sha256:b6a85871a79d2e3b22d2d1b94ac2824226a63c6b741c88f7ae975f18b6778374"},
+    {file = "iniconfig-2.0.0.tar.gz", hash = "sha256:2d91e135bf72d31a410b17c16da610a82cb55f6b0477d1a902134b24a455b8b3"},
 ]
 
 [[package]]
@@ -1295,6 +1348,22 @@ docs = ["furo (>=2023.9.10)", "proselint (>=0.13)", "sphinx (>=7.2.6)", "sphinx-
 test = ["appdirs (==1.4.4)", "covdefaults (>=2.3)", "pytest (>=7.4.3)", "pytest-cov (>=4.1)", "pytest-mock (>=3.12)"]
 
 [[package]]
+name = "pluggy"
+version = "1.4.0"
+description = "plugin and hook calling mechanisms for python"
+category = "main"
+optional = false
+python-versions = ">=3.8"
+files = [
+    {file = "pluggy-1.4.0-py3-none-any.whl", hash = "sha256:7db9f7b503d67d1c5b95f59773ebb58a8c1c288129a88665838012cfb07b8981"},
+    {file = "pluggy-1.4.0.tar.gz", hash = "sha256:8c85c2876142a764e5b7548e7d9a0e0ddb46f5185161049a79b7e974454223be"},
+]
+
+[package.extras]
+dev = ["pre-commit", "tox"]
+testing = ["pytest", "pytest-benchmark"]
+
+[[package]]
 name = "prompt-toolkit"
 version = "3.0.43"
 description = "Library for building powerful interactive command lines in Python"
@@ -1352,6 +1421,31 @@ files = [
 
 [package.extras]
 tests = ["pytest"]
+
+[[package]]
+name = "pybads"
+version = "1.0.3"
+description = "Bayesian Adaptive Direct Search in Python."
+category = "main"
+optional = false
+python-versions = ">=3.9"
+files = [
+    {file = "PyBADS-1.0.3-py3-none-any.whl", hash = "sha256:5dd30992d77c4e5b2559097d8ef0eae97e9764bbd48825da440b77057921fef6"},
+    {file = "PyBADS-1.0.3.tar.gz", hash = "sha256:c79e86c88494600bb8398513cfaa5b6eb01951860b969b655321f48b8c2f4448"},
+]
+
+[package.dependencies]
+cma = ">=3.1.0"
+gpyreg = ">=0.1.0"
+matplotlib = ">=3.5.1"
+numpy = ">=1.22.1"
+pytest = ">=6.2.5"
+pytest-mock = ">=3.6.1"
+pytest-rerunfailures = ">=10.2"
+scipy = ">=1.7.3"
+
+[package.extras]
+dev = ["build (>=0.9.0)", "corner (>=2.2.1)", "dill (>=0.3.5.1)", "imageio (>=2.13.5)", "myst-nb (>=0.13.1)", "numpydoc (>=1.2.1)", "pylint (>=2.15.5)", "pytest-cov (>=4.0.0)", "sphinx (>=4.3.2)", "sphinx-book-theme (>=0.2.0)"]
 
 [[package]]
 name = "pygments"
@@ -1503,6 +1597,63 @@ httpstan = ">=4.11,<4.12"
 numpy = ">=1.19,<2.0"
 pysimdjson = ">=5.0.2,<6.0.0"
 setuptools = "*"
+
+[[package]]
+name = "pytest"
+version = "8.0.0"
+description = "pytest: simple powerful testing with Python"
+category = "main"
+optional = false
+python-versions = ">=3.8"
+files = [
+    {file = "pytest-8.0.0-py3-none-any.whl", hash = "sha256:50fb9cbe836c3f20f0dfa99c565201fb75dc54c8d76373cd1bde06b06657bdb6"},
+    {file = "pytest-8.0.0.tar.gz", hash = "sha256:249b1b0864530ba251b7438274c4d251c58d868edaaec8762893ad4a0d71c36c"},
+]
+
+[package.dependencies]
+colorama = {version = "*", markers = "sys_platform == \"win32\""}
+exceptiongroup = {version = ">=1.0.0rc8", markers = "python_version < \"3.11\""}
+iniconfig = "*"
+packaging = "*"
+pluggy = ">=1.3.0,<2.0"
+tomli = {version = ">=1.0.0", markers = "python_version < \"3.11\""}
+
+[package.extras]
+testing = ["argcomplete", "attrs (>=19.2.0)", "hypothesis (>=3.56)", "mock", "nose", "pygments (>=2.7.2)", "requests", "setuptools", "xmlschema"]
+
+[[package]]
+name = "pytest-mock"
+version = "3.12.0"
+description = "Thin-wrapper around the mock package for easier use with pytest"
+category = "main"
+optional = false
+python-versions = ">=3.8"
+files = [
+    {file = "pytest-mock-3.12.0.tar.gz", hash = "sha256:31a40f038c22cad32287bb43932054451ff5583ff094bca6f675df2f8bc1a6e9"},
+    {file = "pytest_mock-3.12.0-py3-none-any.whl", hash = "sha256:0972719a7263072da3a21c7f4773069bcc7486027d7e8e1f81d98a47e701bc4f"},
+]
+
+[package.dependencies]
+pytest = ">=5.0"
+
+[package.extras]
+dev = ["pre-commit", "pytest-asyncio", "tox"]
+
+[[package]]
+name = "pytest-rerunfailures"
+version = "13.0"
+description = "pytest plugin to re-run tests to eliminate flaky failures"
+category = "main"
+optional = false
+python-versions = ">=3.7"
+files = [
+    {file = "pytest-rerunfailures-13.0.tar.gz", hash = "sha256:e132dbe420bc476f544b96e7036edd0a69707574209b6677263c950d19b09199"},
+    {file = "pytest_rerunfailures-13.0-py3-none-any.whl", hash = "sha256:34919cb3fcb1f8e5d4b940aa75ccdea9661bade925091873b7c6fa5548333069"},
+]
+
+[package.dependencies]
+packaging = ">=17.1"
+pytest = ">=7"
 
 [[package]]
 name = "python-dateutil"
@@ -1995,4 +2146,4 @@ multidict = ">=4.0"
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.10"
-content-hash = "4ea5168fee2fd99efc2f727165c636115b257480c5dc23ff3e39245363acb08b"
+content-hash = "068d9b30d2278608106d56edd1be513dc85c7fb9f44130334a3e7cec5719e2d0"
