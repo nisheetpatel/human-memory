@@ -3,6 +3,8 @@ __pycache__
 *.pyc
 .mypy_cache/
 
+# psychopy experiment folder
+src/expt_psychopy/
 
 # local folders
 figures/
