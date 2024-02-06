@@ -3,10 +3,11 @@ from dataclasses import dataclass, field
 from typing import Callable, Protocol, Type, Union
 
 import numpy as np
+from scipy import stats
+
 from definitions import Action, Experience, ExperienceBuffer, ModelName, State
 from model.q_table import NoiseTable, NoiseTableDRA, NoiseTableScalar, QTable
 from model.utils import ModelParams, indexer_slots
-from scipy import stats
 
 
 class Agent(ABC):
@@ -49,6 +50,7 @@ class NoisyQAgent(Agent):
         prob_actions = softargmax(
             self.q_table.values[idx] + zeta * self.noise_table.values[idx], self.p.beta
         )
+        # prob_actions = self.get_action_prob(state)
 
         # choose action randomly given action probabilities
         action = np.random.choice(np.arange(n_actions), p=prob_actions)

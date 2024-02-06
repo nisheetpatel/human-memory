@@ -2,7 +2,6 @@ from abc import ABC, abstractmethod
 from typing import Union
 
 import numpy as np
-
 from definitions import Experience, ExperienceBuffer
 from model.utils import ModelParams, indexer_slots
 
