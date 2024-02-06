@@ -4,7 +4,7 @@ __pycache__
 .mypy_cache/
 
 # psychopy experiment folder
-src/expt_psychopy/
+expt_psychopy/
 
 # local folders
 figures/
