@@ -1,0 +1,27 @@
+[tool.poetry]
+name = "human-memory"
+version = "0.1.0"
+description = ""
+authors = ["nisheetpatel <nisheet.pat@gmail.com>"]
+readme = "README.md"
+packages = [{include = "human_memory"}]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+black = "^24.1.1"
+ipython = "^8.21.0"
+matplotlib = "^3.8.2"
+numpy = "^1.26.4"
+pandas = "^2.2.0"
+psytrack = "^2.0.1"
+pystan = "^3.8.0"
+ruff = "^0.2.1"
+scikit-learn = "^1.4.0"
+scipy = "^1.12.0"
+seaborn = "^0.13.2"
+statsmodels = "^0.14.1"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
