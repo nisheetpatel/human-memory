@@ -6,4 +6,22 @@ This is the code repository for a project that aims to test whether, how, and ho
 
 # Installation
 
-Install the required packages in a new environment using [mamba](https://github.com/mamba-org/mamba) with `mamba create --name <env_name> --file requirements.txt`, or using [conda](https://docs.conda.io/en/latest/) with `conda create --name <env_name> --file requirements.txt`, or in an existing environment using pip with `pip install -r requirements.txt`.
+We use [Poetry](https://python-poetry.org/), a modern python packaging and dependency management software. If you are unfamiliar with it, [here's a quick tutorial](https://www.youtube.com/watch?v=0f3moPe_bhk). To get started, you can use the following commands:
+
+```sh
+# clone the git repository and jump into the project folder
+gh repo clone nisheetpatel/human-memory
+cd human-memory
+
+# install poetry if you don't have it already
+pip install poetry
+
+# configure virtual env to be created within the project
+poetry config virtualenvs.in-project true
+
+# create the environment and install dependencies
+poetry install
+
+# activate the virtual environment
+poetry shell
+```
