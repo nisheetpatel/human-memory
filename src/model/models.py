@@ -3,6 +3,7 @@ from dataclasses import dataclass, field
 from typing import Callable, Protocol, Type, Union
 
 import numpy as np
+from scipy import stats
 
 from definitions import Action, Experience, ExperienceBuffer, ModelName, State
 from model.q_table import NoiseTable, NoiseTableDRA, NoiseTableScalar, QTable
@@ -36,12 +37,12 @@ class NoisyQAgent(Agent):
     q_table: QTable
     noise_table: NoiseTable
     p: ModelParams = ModelParams()
-    _index: Callable = indexer_slots
+    get_index: Callable = indexer_slots
     exp_buffer: ExperienceBuffer = field(default_factory=list, repr=False)
 
     def act(self, state: State):
         # fetch index
-        idx = self._index(state=state)
+        idx = self.get_index(state=state)
         n_actions = len(idx)
 
         # draw from noisy memory distribution and determine action probabilities
@@ -49,11 +50,24 @@ class NoisyQAgent(Agent):
         prob_actions = softargmax(
             self.q_table.values[idx] + zeta * self.noise_table.values[idx], self.p.beta
         )
+        # prob_actions = self.get_action_prob(state)
 
         # choose action randomly given action probabilities
         action = np.random.choice(np.arange(n_actions), p=prob_actions)
 
         return action, prob_actions, zeta
+
+    def get_action_prob(self, state: State):
+        """Probability of choosing actions for a slot machine (task-specific)"""
+        # fetch index
+        idx = self.get_index(state=state)
+        
+        # define q, sigma for option
+        q, sigma = self.q_table.values[idx], self.noise_table.values[idx]
+        prob_yes = stats.norm(q[0], sigma[0]).cdf(q[1])
+
+        return (prob_yes, 1 - prob_yes)
+
 
     def observe(self, experience: Experience) -> None:
         if experience["state"] < 16:

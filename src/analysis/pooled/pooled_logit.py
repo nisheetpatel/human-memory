@@ -9,7 +9,7 @@ def pooled_logit_plots(data: pd.DataFrame) -> None:
     _, ax = plt.subplots()
     data_block = (
         data.loc[
-            data["block_id"] > 0,
+            data["block_id"] > 1,
             [
                 "participant_id",
                 "state",
@@ -28,7 +28,7 @@ def pooled_logit_plots(data: pd.DataFrame) -> None:
     )
 
     logit_params = []
-    for sm in [0, 1, 2, 3]:
+    for sm in [1, 2, 3, 4]:
         data_sm = data_block.loc[data_block["Slot Machine ID"] == sm]
         reg = smf.logit(formula="Response ~ Difficulty", data=data_sm).fit(maxiter=1000)
         logit_params.append(list(reg.params))
@@ -61,10 +61,52 @@ def pooled_logit_plots(data: pd.DataFrame) -> None:
     plt.show()
 
 
+
+def pooled_logit_plots_new(data: pd.DataFrame, save_name: str, title_suffix: str = "") -> None:
+    # data must have columns ['sm_id', 'price', 'reward', 'action', 'id']
+    _, ax = plt.subplots()
+
+    logit_params = []
+    sm_ids = data["sm_id"].unique()
+    sm_ids.sort()
+    for sm in sm_ids:
+        data_sm = data.loc[data["sm_id"] == sm]
+        reg = smf.logit(formula="action ~ price", data=data_sm).fit(maxiter=1000)
+        logit_params.append(list(reg.params))
+        # print(f"Slot Machine {sm}")
+        # print(reg.summary())
+        # print("\n\n\n")
+
+    logit_params = np.asarray(logit_params)
+    exp_b0 = np.exp(logit_params[:, 0])
+    slopes = logit_params[:, 1] * exp_b0 / (1 + exp_b0) ** 2
+
+    x = np.linspace(-10, 10, 1000)
+    linestyles = ["solid", "dashed", "dotted", "dashdot"]
+
+    for i, (p, l) in enumerate(zip(logit_params, linestyles)):
+        ax.plot(
+            x,
+            expit(p[1] * x + p[0]),
+            label=f"SM {i+1}, slope {slopes[i]:.2f}",
+            linestyle=l,
+        )
+
+    ax.set_xlim([-10, 10])
+    ax.set_xticks([-2, -1, 1, 2])
+    ax.set_xlabel("Difficulty")
+    ax.set_ylabel("Response")
+    ax.set_title("Pooled Logisitc Regression fits" + title_suffix)
+    ax.legend()
+
+    plt.savefig(save_name)
+    plt.close()
+
+
 def pooled_logit_plots_per_block(data: pd.DataFrame) -> None:
     fig, axs = plt.subplots(1, 4, figsize=(20, 5))
 
-    for block_id, ax in zip([0, 1, 2, 3], axs):
+    for block_id, ax in zip(data["block_id"].unique(), axs):
         data_block = (
             data.loc[
                 data["block_id"] == block_id,
@@ -86,7 +128,7 @@ def pooled_logit_plots_per_block(data: pd.DataFrame) -> None:
         )
 
         logit_params = []
-        for sm in [0, 1, 2, 3]:
+        for sm in [1, 2, 3, 4]:
             data_sm = data_block.loc[data_block["Slot Machine ID"] == sm]
             reg = smf.logit(formula="Response ~ Difficulty", data=data_sm).fit(
                 maxiter=1000
