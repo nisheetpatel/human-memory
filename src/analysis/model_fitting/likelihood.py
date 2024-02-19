@@ -5,41 +5,9 @@ import pandas as pd
 from pybads import BADS
 from sklearn.model_selection import TimeSeriesSplit
 
-from analysis.data import Processor as DataProcessor
 from definitions import DATA_PATH
-from model.model_new import DDRA, Agent, DEqualRA, DFreqRA, DStakesRA
-
-
-class DataTransformer:
-    COLUMNS_OF_INTEREST = [
-        "Slot Machine ID",
-        "slot_machine_mean_payoff",
-        "price",
-        "reward_drawn",
-        "key_resp.keys",
-        "id"
-    ]
-
-    def __init__(self, data_processor: DataProcessor):
-        self.df_orig = data_processor.get_processed_data()
-        self.df_orig = self.df_orig.loc[self.df_orig["above_chance"]]
-
-    @staticmethod
-    def transform_data(data: pd.DataFrame) -> pd.DataFrame:
-        data['key_resp.keys'].replace('', np.nan, inplace=True)
-        data.dropna(subset=['key_resp.keys'], inplace=True)
-        data["sm_id"] = data["Slot Machine ID"] - 1
-        data["price"] = data["price"] - data["slot_machine_mean_payoff"]
-        data["reward"] = data["reward_drawn"]
-        data["action"] = data["key_resp.keys"].map({"right": 1, "left": 0}).astype(int)
-        return data.loc[:, ["sm_id", "price", "reward", "action", "id"]]
-
-    def get_participant_data(self, participant_id) -> pd.DataFrame:
-        return self.transform_data(self.df_orig.loc[
-            self.df_orig["participant_id"] == participant_id, 
-            self.COLUMNS_OF_INTEREST]
-        )
-
+from src.data.transformer import DataTransformer
+from src.simulation.models import DRA, Agent, EqualRA, FreqRA, StakesRA
 
 
 class ResultsSaver:
@@ -57,7 +25,7 @@ class ResultsSaver:
         self.all_results_df = pd.concat([self.all_results_df, df]).reset_index(drop=True)
 
     def add_performance_scores_to_results(self) -> None:
-        perf_unique = self.data_transformer.df_orig.drop_duplicates(subset='participant_id')[
+        perf_unique = self.data_transformer.df.drop_duplicates(subset='participant_id')[
             ['participant_id', 'id', 'performance', 'accuracy', 'above_chance']
         ]
         self.all_results_df = pd.merge(self.all_results_df, perf_unique,
@@ -93,7 +61,7 @@ class ModelFitter:
     # Constants
     N_RUNS = 3
     N_SPLITS = 5
-    AGENT_CLASSES = [DDRA, DFreqRA, DStakesRA, DEqualRA]
+    AGENT_CLASSES = [DRA, FreqRA, StakesRA, EqualRA]
     BOUNDS = {
         'lower_bounds': np.array([0.001, 0.001, 0.01, 1.]),
         'upper_bounds': np.array([0.5, 0.5, 1., 10.]),
@@ -174,11 +142,10 @@ class ModelFitter:
 
 
 if __name__ == "__main__":
-    data_processor = DataProcessor(path=DATA_PATH+"pilot_slot-machines_3/")
-    data_transformer = DataTransformer(data_processor=data_processor)
+    data_transformer = DataTransformer()
 
     # Extract the participant data here
-    ids = data_transformer.df_orig["participant_id"].unique()
+    ids = data_transformer.df["participant_id"].unique()
     data = [data_transformer.get_participant_data(id) for id in ids]
 
     # initialize the results saver

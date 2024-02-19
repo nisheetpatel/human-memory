@@ -1,6 +1,10 @@
 import pandas as pd
-from likelihood_new import ModelFitter
-from model.model_new import DDRA, DEqualRA, DFreqRA, DStakesRA, Simulator, Task
+
+from src.simulation.models import DRA, EqualRA, FreqRA, StakesRA
+from src.simulation.simulator import Simulator
+from src.simulation.task import SlotMachinesTask
+
+from .likelihood import ModelFitter
 
 
 # redefine results saver (change the actual class later)
@@ -22,13 +26,13 @@ results_saver = ResultsSaver()
 
 # things that don't need to be repeated
 lmdas = [0.1, 0.25, 0.5, 1]
-env = Task()
+env = SlotMachinesTask()
 data_columns = ["sm_id", "price", "reward", "action"]
 data = []
 
 for lmda in lmdas:
     # generate data from each model
-    agent_classes = [DDRA, DFreqRA, DStakesRA, DEqualRA]
+    agent_classes = [DRA, FreqRA, StakesRA, EqualRA]
     agents = [agent(lmda=lmda) for agent in agent_classes]
     simulators = [Simulator(env, agent, 4_000) for agent in agents]
 
@@ -116,6 +120,7 @@ plt.show()
 
 # load data and get best fitting models and parameters for each participant
 import numpy as np
+
 from definitions import DATA_PATH
 
 df = pd.read_csv(DATA_PATH+"all_fit_results_fixed_sb_cross-validated_new.csv")
