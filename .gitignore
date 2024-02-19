@@ -7,9 +7,9 @@ __pycache__
 expt_psychopy/
 
 # local folders
-figures/
-data/
-models/
+/figures/
+/data/
+/models/
 
 # data files
 *.npz
