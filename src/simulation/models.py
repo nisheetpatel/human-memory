@@ -5,51 +5,6 @@ import numpy as np
 from scipy.stats import entropy, norm
 
 
-class Task:
-    def __init__(self, rel_stakes: int = 3, rel_freq: int = 3):
-        # necessary variables for initializing state distribution
-        low = np.array([1, rel_stakes, rel_stakes, 1])
-        high = np.array([rel_stakes, 1, 1, rel_stakes])
-        stakes = np.hstack([high, low, high, low])
-        freq = np.repeat(np.array([rel_freq, 1]), len(stakes) / 2)
-
-        # defining state distribution
-        state_distribution = stakes * freq
-        self.state_distribution = state_distribution / np.sum(state_distribution)
-
-        # defining other task parameters
-        self.delta = 1.
-        self.prices = np.array([-2, -1, 1, 2]) * self.delta
-
-        # initial state
-        self._state = None
-
-    def step(self, action: bool):
-        # define observation
-        sm_id = self._state // 4
-        price = self.prices[self._state % 4]
-
-        # define observed reward
-        reward = 0
-
-        if action == 0: # Yes
-            reward = np.random.normal(-price, 0.1)
-
-        # define next state, termination, info (observed sm_id & price)
-        next_state = -1
-        done = True
-        info = sm_id, price
-
-        # reset internal state
-        self.reset()
-
-        return next_state, reward, done, info
-
-    def reset(self) -> tuple[int, float]:
-        self._state = np.random.choice(np.arange(16), p=self.state_distribution)
-        return self._state // 4, self.prices[self._state % 4]
-
-
 class Agent(Protocol):
     def action_prob(self, sm_id: int, price: float) -> tuple:
         ...
@@ -61,7 +16,7 @@ class Agent(Protocol):
         ...
 
 
-class DDRA:
+class DRA:
     def __init__(self, lr_v: float = 0.05, lr_s: float = 0.05, lmda: float = 0.1,
                  sigma_0: float = 2.5, sigma_base: float = 5) -> None:
         # define parameters
@@ -99,7 +54,7 @@ class DDRA:
         self.sigma = np.clip(self.sigma, 0.01, self.sigma_base)
 
 
-class DOtherRA(ABC):
+class OtherRA(ABC):
     def __init__(self, lr_v: float = 0.05, lr_s: float = 0.05, lmda: float = 0.1,
                  sigma_0: float = 5, sigma_base: float = 5) -> None:
 
@@ -152,21 +107,21 @@ class DOtherRA(ABC):
         self.sigma = np.clip(self.sigma, 0.01, self.sigma_base)
 
 
-class DEqualRA(DOtherRA):
+class EqualRA(OtherRA):
     @property
     def norm(self):
         norm_factor = np.ones(4)
         return 4 * norm_factor / np.sum(norm_factor[:4])
 
 
-class DFreqRA(DOtherRA):
+class FreqRA(OtherRA):
     @property
     def norm(self):
         norm_factor = np.array([np.sqrt(3),np.sqrt(3),1,1])
         return 4 * norm_factor / np.sum(norm_factor[:4])
 
 
-class DStakesRA(DOtherRA):
+class StakesRA(OtherRA):
     @property
     def norm(self):
         norm_factor = np.array([np.sqrt(3),1,np.sqrt(3),1])
@@ -219,26 +174,3 @@ class MaxEntRL:
         self.q[sm_id, self.p_id[price]] += self.lr_v * (reward - self.v[sm_id, self.p_id[price]])
         p = self.action_prob(sm_id, price)
         self.v[sm_id, self.p_id[price]] = np.dot(p, np.array([self.q[sm_id, self.p_id[price]], 0])) + self.alpha * entropy(p)
-
-
-class Simulator:
-
-    def __init__(self, env: Task, agent: DDRA, n_episodes: int = 1_000):
-        self.env = env
-        self.agent = agent
-        self.n_episodes = n_episodes
-
-    def run_episode(self) -> tuple[int, float, float, bool]:
-        sm_id, price = self.env.reset()
-        action = self.agent.act(sm_id, price)
-        _, reward, _, _ = self.env.step(action)
-        self.agent.update(sm_id, price, reward, action)
-        return (sm_id, price, reward, action)
-
-    def train_agent(self, record_data: bool = False) -> list[tuple]:
-        data = []
-        for _ in range(self.n_episodes):
-            data_tuple = self.run_episode()
-            if record_data:
-                data.append(data_tuple)
-        return data
