@@ -10,7 +10,7 @@ df_classes = pd.read_csv(DATA_PATH+'model_classes.csv')
 df_classes = df_classes.loc[:, ["id", "class", "class_bads"]]
 
 # set parameters for fitting hierarchical model
-hierarchical_model_params = {"n_chains": 8, "n_samples": 2_500}
+hierarchical_model_params = {"n_chains": 4, "n_samples": 25_000}
 
 # read and process data, then extract performance metrics
 data_processor = DataProcessor(path=DATA_PATH+"pilot_slot-machines_3/")
