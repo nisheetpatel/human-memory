@@ -13,21 +13,21 @@ class Env(Protocol):
 
 class SlotMachinesTask:
     def __init__(self, rel_stakes: int = 3, rel_freq: int = 3):
-        # necessary variables for initializing state distribution
+        # define necessary variables for initial state distribution
         low = np.array([1, rel_stakes, rel_stakes, 1])
         high = np.array([rel_stakes, 1, 1, rel_stakes])
         stakes = np.hstack([high, low, high, low])
         freq = np.repeat(np.array([rel_freq, 1]), len(stakes) / 2)
 
-        # defining state distribution
+        # define the initial state distribution
         state_distribution = stakes * freq
         self.state_distribution = state_distribution / np.sum(state_distribution)
 
-        # defining other task parameters
-        self.delta = 1.
+        # define other task parameters
+        self.delta = 0.75
         self.prices = np.array([-2, -1, 1, 2]) * self.delta
 
-        # initial state
+        # set initial state
         self._state = None
 
     def step(self, action: bool):
@@ -35,16 +35,21 @@ class SlotMachinesTask:
         sm_id = self._state // 4
         price = self.prices[self._state % 4]
 
-        # define observed reward
-        reward = 0
+        # define observed return
+        rtrn = np.random.normal(0, 1)
 
+        # define reward
         if action == 0: # Yes
-            reward = np.random.normal(-price, 0.1)
+            reward = rtrn - price
+        elif action == 1: # No
+            reward = 0
+        else:
+            raise ValueError(action, f"Invalid action {action}. Must be 0 or 1.")
 
-        # define next state, termination, info (observed sm_id & price)
+        # define next state, termination, info (feedback observations)
         next_state = -1
         done = True
-        info = sm_id, price
+        info = {"sm_id": sm_id, "return": rtrn, "price": price}
 
         # reset internal state
         self.reset()
