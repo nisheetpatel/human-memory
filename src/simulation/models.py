@@ -17,8 +17,8 @@ class Agent(Protocol):
 
 
 class DRA:
-    def __init__(self, lr_v: float = 0.01, lr_s: float = 0.01, lmda: float = 0.1,
-                 sigma_0: float = 5, sigma_base: float = 5) -> None:
+    def __init__(self, lr_v: float = 0.01, lr_s: float = 0.05, lmda: float = 0.1,
+                 sigma_0: float = 2.5, sigma_base: float = 5) -> None:
         # define parameters
         self.lr_v = lr_v
         self.lr_s = lr_s
@@ -32,6 +32,7 @@ class DRA:
 
     def action_prob(self, sm_id: int, price: float):
         p_no = norm.cdf((price - self.v[sm_id]) / self.sigma[sm_id])
+        # p_no = (np.random.normal(self.v[sm_id], self.sigma[sm_id]) - price) < 0
         return (1-p_no, p_no)
 
     def act(self, sm_id: int, price: float):
@@ -63,8 +64,8 @@ class DRA:
 
 
 class OtherRA(ABC):
-    def __init__(self, lr_v: float = 0.01, lr_s: float = 0.01, lmda: float = 0.1,
-                 sigma_0: float = 5, sigma_base: float = 5) -> None:
+    def __init__(self, lr_v: float = 0.01, lr_s: float = 0.05, lmda: float = 0.1,
+                 sigma_0: float = 3.5, sigma_base: float = 5) -> None:
 
         self.v = np.array([0,0,0,0])
         self.sigma_scalar = sigma_0
@@ -84,6 +85,7 @@ class OtherRA(ABC):
 
     def action_prob(self, sm_id: int, price: float):
         p_no = norm.cdf((price - self.v[sm_id]) / self.sigma[sm_id])
+        # p_no = (np.random.normal(self.v[sm_id], self.sigma[sm_id]) - price) < 0
         return (1-p_no, p_no)
 
     def act(self, sm_id: int, price: float):
