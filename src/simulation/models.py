@@ -1,8 +1,9 @@
 from abc import ABC, abstractmethod
-from typing import Protocol
+from functools import partial
+from typing import Callable, Protocol
 
 import numpy as np
-from scipy.stats import norm
+from scipy.stats import norm, t
 
 
 class Agent(Protocol):
@@ -16,9 +17,13 @@ class Agent(Protocol):
         ...
 
 
+######################################################################
+# Resource Allocation Models
+######################################################################
+
 class DRA:
     def __init__(self, lr_v: float = 0.01, lr_s: float = 0.05, lmda: float = 0.1,
-                 sigma_0: float = 2.5, sigma_base: float = 5) -> None:
+                 sigma_base: float = 5) -> None:
         # define parameters
         self.lr_v = lr_v
         self.lr_s = lr_s
@@ -27,8 +32,8 @@ class DRA:
         
         # define initial value and noise
         self.v = np.array([0.,0.,0.,0.])
-        self.sigma = np.array([1.,1.,1.,1.]) * sigma_0
-        self.sigma_history = [sigma_0]
+        self.sigma = np.array([1.,1.,1.,1.]) * sigma_base / 2
+        self.sigma_history = [sigma_base / 2]
 
     def action_prob(self, sm_id: int, price: float):
         p_no = norm.cdf((price - self.v[sm_id]) / self.sigma[sm_id])
@@ -65,10 +70,10 @@ class DRA:
 
 class OtherRA(ABC):
     def __init__(self, lr_v: float = 0.01, lr_s: float = 0.05, lmda: float = 0.1,
-                 sigma_0: float = 3.5, sigma_base: float = 5) -> None:
+                 sigma_base: float = 5) -> None:
 
         self.v = np.array([0,0,0,0])
-        self.sigma_scalar = sigma_0
+        self.sigma_scalar = sigma_base / 2
         self.sigma = self.sigma_scalar * np.array([1,1,1,1]) / self.norm
 
         self.lr_v = lr_v
@@ -138,23 +143,26 @@ class StakesRA(OtherRA):
         return 4 * norm_factor / np.sum(norm_factor[:4])
 
 
+######################################################################
+# RL models
+######################################################################
+
+
 def softargmax(x: np.ndarray, beta: float = 1) -> np.ndarray:
     y = np.exp(beta * x - np.max(beta * x))
     return y / y.sum()
 
 
 class RL:
-    def __init__(self, lr_v: float = 0.05, beta: float = 10) -> None:
+    def __init__(self, lr_v: float = 0.05) -> None:
         # define parameters
         self.lr_v = lr_v
-        self.beta = beta
 
         # define initial values
         self.v = np.array([0., 0., 0., 0.])
 
     def action_prob(self, sm_id: int, price: float) -> np.ndarray:
-        # return np.argmax(np.array([self.v[sm_id] - price, 0]))
-        return softargmax(np.array([self.v[sm_id] - price, 0]), self.beta)
+        return np.argmax(np.array([self.v[sm_id] - price, 0]))
 
     def act(self, sm_id: int, price: float):
         return np.random.choice([0,1], p=self.action_prob(sm_id, price))
@@ -180,3 +188,139 @@ class MaxEntRL:
 
     def update(self, sm_id: int, price: float, reward: float, rtrn: float, action: int):
         self.v[sm_id] += self.lr_v * (rtrn - self.v[sm_id])
+
+
+######################################################################
+# Bayesian Ideal Observers
+######################################################################
+
+class GaussianInverseGamma:
+    def __init__(self, mu_0, kappa_0, alpha_0, beta_0, lambda_val):
+        self.mu_0 = mu_0
+        self.kappa_0 = kappa_0
+        self.alpha_0 = alpha_0
+        self.beta_0 = beta_0
+        self.lambda_val = min(lambda_val, 0.9)
+
+    def update(self, data):
+        n = len(data)
+        x_bar = np.mean(data)
+
+        kappa_n = self.kappa_0 + n
+        mu_n = (self.kappa_0 * self.mu_0 + n * x_bar) / kappa_n
+
+        alpha_n = self.alpha_0 + n / 2
+        beta_n = (
+            self.beta_0
+            + 0.5 * np.sum((data - x_bar) ** 2)
+            + (n * self.kappa_0) / (2 * (self.kappa_0 + n)) * (x_bar - self.mu_0) ** 2
+        )
+
+        # Update the parameters
+        self.mu_0 = mu_n
+        self.kappa_0 = kappa_n
+        self.alpha_0 = alpha_n
+        self.beta_0 = beta_n
+
+    def get_params(self):
+        return {
+            "mu": self.mu_0,
+            "kappa": self.kappa_0,
+            "alpha": self.alpha_0,
+            "beta": self.beta_0,
+        }
+
+
+class LeakyGaussianInverseGamma(GaussianInverseGamma):
+
+    def update(self, data):
+        # Leaky update for the mean
+        x_bar = np.mean(data)
+        self.mu_0 = (1 - self.lambda_val) * self.mu_0 + self.lambda_val * x_bar
+
+        # Rest of the updates can remain similar to the base class
+        # (or can be modified for further "leakiness" if required)
+        super().update(data)
+
+
+# Define the type for our choice policies
+ChoicePolicy = Callable[[GaussianInverseGamma, float], int]
+
+
+def optimal_choice(gig: GaussianInverseGamma, p: float) -> int:
+    return 0 if gig.mu_0 > p else 1
+
+
+def softmax_choice(gig: GaussianInverseGamma, p: float, beta: float = 2) -> int:
+    prob_yes = 1 / (1 + np.exp(-beta * (gig.mu_0 - p)))
+    return 0 if np.random.rand() < prob_yes else 1
+
+
+def prob_from_t(gig: GaussianInverseGamma, p: float) -> int:
+    scale = np.sqrt(gig.beta_0 * (1 + gig.kappa_0) / (gig.alpha_0 * gig.kappa_0))
+    prob_mu_greater_p = 1 - t.cdf(p, 2 * gig.alpha_0, gig.mu_0, scale)
+    return 0 if np.random.rand() < prob_mu_greater_p else 1
+
+
+def prob_from_gaussian(gig: GaussianInverseGamma, p: float) -> int:
+    prob_return_greater_p = 1 - norm.cdf(
+        p, gig.mu_0, np.sqrt(gig.beta_0 / (gig.alpha_0))
+    )
+    return 0 if np.random.rand() < prob_return_greater_p else 1
+
+
+class BayesianIdealObserver:
+    def __init__(
+        self,
+        model: GaussianInverseGamma,
+        policy: ChoicePolicy,
+        mu_0: float = 0,
+        kappa_0: float = 1,
+        alpha_0: float = 1,
+        beta_0: float = 1,
+        lambda_val: float = 0.5,
+    ) -> None:
+        params = {"mu_0": mu_0, "kappa_0": kappa_0, "alpha_0": alpha_0, "beta_0": beta_0, "lambda_val": lambda_val}
+        self.slot_machines = [model(**params) for _ in range(4)]
+        self.policy = policy
+        self.return_history = [[], [], [], []]
+
+    def act(self, sm_id: int, price: float) -> int:
+        return self.policy(self.slot_machines[sm_id], price)
+
+    def update(self, sm_id: int, price: float, reward: float, rtrn: float, action: int):
+        # append current return
+        self.return_history[sm_id].append(rtrn)
+
+        # update parameters of currently shown slot machine
+        self.slot_machines[sm_id].update(self.return_history[sm_id])
+
+
+class OptimalBIO(BayesianIdealObserver):
+    def __init__(self, model = GaussianInverseGamma, policy = partial(optimal_choice), **kwargs):
+        super().__init__(model=model, policy=policy)
+
+
+class LeakyOptimalBIO(BayesianIdealObserver):
+    def __init__(self, model = LeakyGaussianInverseGamma, policy = partial(optimal_choice), **kwargs):
+        super().__init__(model=model, policy=policy)
+
+
+class SoftmaxBIO(BayesianIdealObserver):
+    def __init__(self, model = GaussianInverseGamma, policy = partial(softmax_choice), **kwargs):
+        super().__init__(model=model, policy=policy)
+
+
+class LeakySoftmaxlBIO(BayesianIdealObserver):
+    def __init__(self, model = LeakyGaussianInverseGamma, policy = partial(softmax_choice), **kwargs):
+        super().__init__(model=model, policy=policy)
+
+
+class ProbTBIO(BayesianIdealObserver):
+    def __init__(self, model = GaussianInverseGamma, policy = partial(prob_from_t), **kwargs):
+        super().__init__(model=model, policy=policy)
+
+
+class LeakyProbTBIO(BayesianIdealObserver):
+    def __init__(self, model = LeakyGaussianInverseGamma, policy = partial(prob_from_t), **kwargs):
+        super().__init__(model=model, policy=policy)

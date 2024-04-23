@@ -12,7 +12,7 @@ class Env(Protocol):
 
 
 class SlotMachinesTask:
-    def __init__(self, rel_stakes: int = 3, rel_freq: int = 3):
+    def __init__(self, rel_stakes: int = 3, rel_freq: int = 2):
         # define necessary variables for initial state distribution
         low = np.array([1, rel_stakes, rel_stakes, 1])
         high = np.array([rel_stakes, 1, 1, rel_stakes])
