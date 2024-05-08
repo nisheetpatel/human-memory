@@ -28,7 +28,7 @@ class RLModelParams:
 
 @dataclass
 class BIOModelParams:
-    mu_0: float = 0.1
+    mu_0: float = 1
     kappa_0: float = 1
     alpha_0: float = 1
     beta_0: float = 1
@@ -52,7 +52,9 @@ class ParamGenerator:
 
     def generate_lognormal_params(self):
         args = self._get_arg_vals()
-        param_dist = np.random.lognormal(np.log(args), 0.5, (self.N, len(args)))
+        # param_dist = np.random.lognormal(np.log(args), 0.5, (self.N, len(args)))
+        if self.param_class == BIOModelParams:
+            param_dist = np.random.normal(args, 0, (self.N, len(args)))
         return [self._get_params_class(param_vals) for param_vals in param_dist]
 
 

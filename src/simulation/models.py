@@ -154,7 +154,7 @@ def softargmax(x: np.ndarray, beta: float = 1) -> np.ndarray:
 
 
 class RL:
-    def __init__(self, lr_v: float = 0.05) -> None:
+    def __init__(self, lr_v: float = 0.05, **kwargs) -> None:
         # define parameters
         self.lr_v = lr_v
 
@@ -283,17 +283,26 @@ class BayesianIdealObserver:
         params = {"mu_0": mu_0, "kappa_0": kappa_0, "alpha_0": alpha_0, "beta_0": beta_0, "lambda_val": lambda_val}
         self.slot_machines = [model(**params) for _ in range(4)]
         self.policy = policy
-        self.return_history = [[], [], [], []]
+        self.return_history = []
 
     def act(self, sm_id: int, price: float) -> int:
         return self.policy(self.slot_machines[sm_id], price)
 
+    def _get_return_history(self, sm_id: int) -> list:
+        return [x[1] for x in self.return_history if x[0] == sm_id]
+
     def update(self, sm_id: int, price: float, reward: float, rtrn: float, action: int):
         # append current return
-        self.return_history[sm_id].append(rtrn)
+        self.return_history.append([sm_id, rtrn])
 
         # update parameters of currently shown slot machine
-        self.slot_machines[sm_id].update(self.return_history[sm_id])
+        self.slot_machines[sm_id].update(self._get_return_history(sm_id))
+
+
+class ForgetfulBayesianObserver(BayesianIdealObserver):
+    def _get_return_history(self, sm_id: int) -> list:
+        n_back = 20
+        return [x[1] for x in self.return_history[-n_back:] if x[0] == sm_id]
 
 
 class OptimalBIO(BayesianIdealObserver):
@@ -301,8 +310,8 @@ class OptimalBIO(BayesianIdealObserver):
         super().__init__(model=model, policy=policy)
 
 
-class LeakyOptimalBIO(BayesianIdealObserver):
-    def __init__(self, model = LeakyGaussianInverseGamma, policy = partial(optimal_choice), **kwargs):
+class ForgetfulOptimalBIO(ForgetfulBayesianObserver):
+    def __init__(self, model = GaussianInverseGamma, policy = partial(optimal_choice), **kwargs):
         super().__init__(model=model, policy=policy)
 
 
@@ -311,8 +320,8 @@ class SoftmaxBIO(BayesianIdealObserver):
         super().__init__(model=model, policy=policy)
 
 
-class LeakySoftmaxlBIO(BayesianIdealObserver):
-    def __init__(self, model = LeakyGaussianInverseGamma, policy = partial(softmax_choice), **kwargs):
+class ForgetfulSoftmaxlBIO(ForgetfulBayesianObserver):
+    def __init__(self, model = GaussianInverseGamma, policy = partial(softmax_choice), **kwargs):
         super().__init__(model=model, policy=policy)
 
 
@@ -321,6 +330,6 @@ class ProbTBIO(BayesianIdealObserver):
         super().__init__(model=model, policy=policy)
 
 
-class LeakyProbTBIO(BayesianIdealObserver):
+class ForgetfulProbTBIO(ForgetfulBayesianObserver):
     def __init__(self, model = LeakyGaussianInverseGamma, policy = partial(prob_from_t), **kwargs):
         super().__init__(model=model, policy=policy)
