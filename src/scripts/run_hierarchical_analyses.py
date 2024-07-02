@@ -1,21 +1,20 @@
-from definitions import DATA_PATH, FIGURE_PATH, MODEL_PATH
 from src.analysis.hierarchical.classifier import Classifier
 from src.analysis.hierarchical.model import HierarchicalModel
 from src.analysis.hierarchical.plotter import Plotter
-from src.data.processor import DataProcessor
+from src.data.processor import compute_performance_metrics, get_processed_data
+from src.definitions import DATA_PATH, FIGURE_PATH, MODEL_PATH
 
 # set parameters for fitting hierarchical model
 hierarchical_model_params = {"n_chains": 4, "n_samples": 25_000}
 
 # set parameters for classifier
-classifier_params = {"equality_thresh": 1.7, "class_thresh": 20}
+classifier_params = {"equality_thresh": 1.25, "class_thresh": 5}
 
 # read and process data, then extract performance metrics
-data_processor = DataProcessor(path=DATA_PATH + "pilot_slot-machines_3/")
-df = data_processor.get_processed_data()
+df = get_processed_data(data_path=DATA_PATH + "pilot_slot-machines_3/")
 # df_good = df.loc[df["above_chance"]]
 df_all = df
-perf = data_processor.extract_performance_metrics(df)
+perf = compute_performance_metrics(df)
 
 # fit hierarchical model to good subjects
 model = HierarchicalModel()

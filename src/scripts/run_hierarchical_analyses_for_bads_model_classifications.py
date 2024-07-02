@@ -1,10 +1,10 @@
 import numpy as np
 import pandas as pd
-
 from definitions import DATA_PATH, FIGURE_PATH, MODEL_PATH
+
 from src.analysis.hierarchical.model import HierarchicalModel
 from src.analysis.hierarchical.plotter import Plotter
-from src.data.processor import DataProcessor
+from src.data.processor import compute_performance_metrics, get_processed_data
 
 # import subjects classified by BADS and BHLR testing
 df_classes = pd.read_csv(DATA_PATH+'model_classes.csv')
@@ -14,11 +14,11 @@ df_classes = df_classes.loc[:, ["id", "class", "class_bads"]]
 hierarchical_model_params = {"n_chains": 4, "n_samples": 25_000}
 
 # read and process data, then extract performance metrics
-data_processor = DataProcessor(path=DATA_PATH+"pilot_slot-machines_3/")
-df = data_processor.get_processed_data()
+df = get_processed_data(data_path=DATA_PATH + "pilot_slot-machines_3/")
 df_good = df.loc[df["above_chance"]]
 df_good = df_good.merge(df_classes, left_on="id", right_on="id")
-perf = data_processor.extract_performance_metrics(df)
+# df_all = df
+perf = compute_performance_metrics(df)
 
 # define model classes for BADS
 model_classes = df_classes["class_bads"].unique()[:-1]
