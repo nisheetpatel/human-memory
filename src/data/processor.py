@@ -195,9 +195,10 @@ def get_processed_data(data_path: str = DATA_PATH) -> pd.DataFrame:
 
 
 
-def compute_performance_metrics() -> pd.DataFrame:
+def compute_performance_metrics(df: pd.DataFrame | None = None) -> pd.DataFrame:
     # Get processed data
-    df = get_processed_data()
+    if df is None:
+        df = get_processed_data()
 
     # compute performance metrics
     perf = df.groupby("id")[["performance", "accuracy", "above_chance"]].mean()

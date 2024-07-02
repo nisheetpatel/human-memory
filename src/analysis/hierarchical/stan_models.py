@@ -8,19 +8,19 @@ LOGIT_DIFF_BIAS = """
         int<lower=0> K; // number of predictors (4 SMs)
         int<lower=1> L; // number of subjects
         
-        int<lower=1, upper=L> ll[N]; // subject id {1,...,L}
-        row_vector<lower=0, upper=1>[K] ss[N]; // slot machine id indicator
+        array[N] int<lower=1, upper=L> ll; // subject id {1,...,L}
+        array[N] row_vector<lower=0, upper=1>[K] ss; // slot machine id indicator
 
-        row_vector[K] X[N];         // predictors
-        int<lower=0, upper=1> y[N]; // response
+        array[N] row_vector[K] X;         // predictors
+        array[N] int<lower=0, upper=1> y; // response
     }
 
     parameters {
-        vector[K] beta[L];  // individual slope
+        array[L] vector[K] beta;  // individual slope
         vector[K] mu_beta;  // Hierarchical mean for slope
         vector<lower=0>[K] sigma_beta; // h std for slope
         
-        vector[K] alpha[L]; // individual intercept
+        array[L] vector[K] alpha; // individual intercept
         vector[K] mu_alpha;   // Hierarchical mean for intercept
         vector<lower=0>[K] sigma_alpha; // h std for intercept
 

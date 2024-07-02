@@ -21,11 +21,11 @@ class HierarchicalModel:
         return prepare_for_stan(data=data, test_only=True)
 
 
-    def fit_posterior(self, data: dict, n_chains=4, n_samples=10_000) -> stan.fit.Fit:
+    def fit_posterior(self, data: dict, n_chains=4, n_samples=10_000, n_warmup=1_000) -> stan.fit.Fit:
         """Build stan model and sample from posterior."""
 
         posterior = stan.build(self.model, data=data)
-        return posterior.sample(num_chains=n_chains, num_samples=n_samples)
+        return posterior.sample(num_chains=n_chains, num_samples=n_samples, num_warmup=n_warmup)
 
 
     def save(self, fit: stan.fit.Fit, filename: str) -> None:

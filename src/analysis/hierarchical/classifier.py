@@ -3,7 +3,7 @@ import pandas as pd
 import stan
 
 
-def test_model_signatures(betas: np.ndarray, e_factor=1.7, th_factor=0) -> np.ndarray:
+def test_model_signatures(betas: np.ndarray, e_factor=1.25, th_factor=0) -> np.ndarray:
     """
     Test percentage of samples from the posterior over betas that
     pass the test for all models in customtype.ModelName.
@@ -58,7 +58,7 @@ def test_model_signatures(betas: np.ndarray, e_factor=1.7, th_factor=0) -> np.nd
 
 class Classifier:
     def __init__(
-        self, fit: stan.fit.Fit, equality_thresh: float = 1.7, class_thresh: float = 20
+        self, fit: stan.fit.Fit, equality_thresh: float = 1.25, class_thresh: float = 5
     ) -> None:
         self.samples = fit["beta"]
         self.equality_thresh = equality_thresh
