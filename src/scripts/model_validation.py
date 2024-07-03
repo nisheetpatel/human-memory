@@ -1,14 +1,9 @@
-import matplotlib.pyplot as plt
-import numpy as np
 import pandas as pd
-import scipy as sp
-import seaborn as sns
 
 from src.data.processor import get_processed_data
 from src.definitions import DATA_PATH
 from src.simulation.experiment import ExperimentBestFitParams, RAModelParams
-from src.simulation.models import DRA, EqualRA, FreqRA, StakesRA
-from src.simulation.simulator import Simulator
+from src.simulation.models import DRA
 
 ########################################################################
 # get the best-fitting parameters for each subject
