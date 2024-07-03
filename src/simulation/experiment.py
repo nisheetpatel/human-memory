@@ -108,3 +108,48 @@ class Experiment:
         data["Model"] = self.model_name
 
         return data
+
+
+class ExperimentBestFitParams:
+    def __init__(
+            self,
+            model_class: Agent,
+            params_and_data: dict[int, dict]
+        ) -> None:
+        # define simulators and model_name
+        self.model_name = model_class.__name__
+        self.simulators = [
+            Simulator(
+                agent=model_class(**asdict(participant_data["params"])),
+                predefined_data=participant_data["data"]
+            )
+            for participant_data in params_and_data.values()
+        ]
+        self.participant_ids = list(params_and_data.keys())
+
+    def run(self) -> None:
+        # Start the timer
+        start = time()
+
+        # train all models in parallel
+        pool = mp.Pool()  # pylint: disable=consider-using-with
+        self.simulators = pool.map(train, self.simulators)
+        pool.close()
+        pool.join()
+
+        # print
+        time_taken = str(dt.timedelta(seconds=time() - start))
+        print(f"Finished training {self.model_name} in {time_taken}.")
+
+    def extract_choice_data(self) -> pd.DataFrame:
+        for idx, simulator in enumerate(self.simulators):
+            simulator.data["participant_id"] = self.participant_ids[idx]
+            simulator.data["lmda"] = simulator.agent.lmda
+            simulator.data["lr_v"] = simulator.agent.lr_v
+            simulator.data["lr_s"] = simulator.agent.lr_s
+
+        data = [s.data for s in self.simulators]
+        data = pd.concat(data, ignore_index=True).reset_index()
+        data["Model"] = self.model_name
+
+        return data
