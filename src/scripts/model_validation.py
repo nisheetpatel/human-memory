@@ -86,15 +86,21 @@ def extract_trial_data(participant_id: int) -> list[tuple[int, float, float]]:
 # define and simulate models
 ########################################################################
 
-def get_params_and_data_for_model(model: str) -> list[list[int, RAModelParams]]:
-    best_params = 
-    [[i, get_best_params(i, model)] for i in sorted(df_fitted_params['Participant ID'].unique())]
+def get_params_and_data_for_model(model: str) -> dict[int, dict]:
+    return {
+        i: {
+            "params": get_best_params(i, model),
+            "data": extract_trial_data(i)
+        }
+        for i in sorted(df_fitted_params['Participant ID'].unique())
+    }
 
 
 model_class = DRA
-exp = ExperimentBestFitParams(model_class=model_class, )
+exp = ExperimentBestFitParams(model_class=model_class, params_and_data=get_params_and_data_for_model("DDRA"))
 exp.run()
-dfs_choice += [exp.extract_choice_data()]
+
+df_choice = exp.extract_choice_data()
 
 
 # analyze
