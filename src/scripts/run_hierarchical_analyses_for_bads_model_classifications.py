@@ -1,10 +1,10 @@
 import numpy as np
 import pandas as pd
-from definitions import DATA_PATH, FIGURE_PATH, MODEL_PATH
 
 from src.analysis.hierarchical.model import HierarchicalModel
 from src.analysis.hierarchical.plotter import Plotter
 from src.data.processor import compute_performance_metrics, get_processed_data
+from src.definitions import DATA_PATH, FIGURE_PATH, MODEL_PATH
 
 # import subjects classified by BADS and BHLR testing
 df_classes = pd.read_csv(DATA_PATH+'model_classes.csv')

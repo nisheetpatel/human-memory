@@ -2,11 +2,11 @@ from multiprocessing import Pool
 
 import numpy as np
 import pandas as pd
-from definitions import DATA_PATH
 from pybads import BADS
 from sklearn.model_selection import TimeSeriesSplit
 
 from src.data.transformer import DataTransformer
+from src.definitions import DATA_PATH
 from src.simulation.models import DRA, Agent, EqualRA, FreqRA, StakesRA
 
 
