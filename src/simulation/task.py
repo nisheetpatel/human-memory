@@ -31,6 +31,9 @@ class SlotMachinesTask:
         self._state = None
 
     def step(self, action: bool):
+        if action not in [0, 1]:
+            raise ValueError(f"Invalid action {action}. Must be 0 or 1.")
+        
         # define observation
         sm_id = self._state // 4
         price = self.prices[self._state % 4]
@@ -38,13 +41,8 @@ class SlotMachinesTask:
         # define observed return
         rtrn = np.random.normal(0, 1)
 
-        # define reward
-        if action == 0: # Yes
-            reward = rtrn - price
-        elif action == 1: # No
-            reward = 0
-        else:
-            raise ValueError(action, f"Invalid action {action}. Must be 0 or 1.")
+        # Calculate reward based on action (0 is Yes, 1 is No)
+        reward = rtrn - price if action == 0 else 0
 
         # define next state, termination, info (feedback observations)
         next_state = -1
@@ -59,3 +57,44 @@ class SlotMachinesTask:
     def reset(self) -> tuple[int, float]:
         self._state = np.random.choice(np.arange(16), p=self.state_distribution)
         return self._state // 4, self.prices[self._state % 4]
+
+
+class SlotMachinesTaskWithPredefinedData:
+    def __init__(self, predefined_data: list[tuple[int, float, float]]):
+        """
+        Initialize the task with predefined data.
+        
+        Args:
+            predefined_data (List[Tuple[int, float, float]]): List of tuples containing
+                (state, price, rtrn) for each trial.
+        """
+        self.predefined_data = predefined_data
+        self.current_trial = 0
+        self.total_trials = len(predefined_data)
+
+    def step(self, action: bool) -> tuple[int, float, bool, dict]:
+        if self.current_trial >= self.total_trials:
+            raise ValueError("All predefined data has been used!")
+        
+        if action not in [0, 1]:
+            raise ValueError(f"Invalid action {action}. Must be 0 or 1.")
+        
+        state, price, rtrn = self.predefined_data[self.current_trial]
+
+        # Calculate reward based on action (0 is Yes, 1 is No)
+        reward = rtrn - price if action == 0 else 0
+        
+        # define next state, termination, info (feedback observations)
+        next_state = -1
+        done = True
+        info = {"sm_id": state // 4, "return": rtrn, "price": price}
+
+        # reset internal state
+        self.reset()
+
+        return next_state, reward, done, info
+
+    def reset(self) -> tuple[int, float]:        
+        self.current_trial += 1
+        state, _, price = self.predefined_data[self.current_trial]
+        return state // 4, price
