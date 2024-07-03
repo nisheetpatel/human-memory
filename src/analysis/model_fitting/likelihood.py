@@ -2,10 +2,10 @@ from multiprocessing import Pool
 
 import numpy as np
 import pandas as pd
+from definitions import DATA_PATH
 from pybads import BADS
 from sklearn.model_selection import TimeSeriesSplit
 
-from definitions import DATA_PATH
 from src.data.transformer import DataTransformer
 from src.simulation.models import DRA, Agent, EqualRA, FreqRA, StakesRA
 
@@ -46,7 +46,7 @@ class ResultsSaver:
             df = self.all_results_df
 
         # Group by 'Participant ID' and get the index of the min 'NLL' in each group
-        best_model_index = df.groupby('Participant ID')['NLL'].idxmin()
+        best_model_index = df.groupby('Participant ID', observed=False)['NLL'].idxmin()
 
         # Use this index to get the corresponding 'Model'
         best_models = df.loc[best_model_index, 'Model']

@@ -63,11 +63,11 @@ class DataProcessor:
 
     def _add_difficulty(self, df: pd.DataFrame) -> pd.DataFrame:
         df["Difficulty"] = df["state"] % 4
-        df["Difficulty"].replace(self.difficulty_map, inplace=True)
+        df["Difficulty"] = df["Difficulty"].replace(self.difficulty_map)
         return df
 
     def _add_response(self, df: pd.DataFrame) -> pd.DataFrame:
-        df["Response"] = df["key_resp.keys"].replace(self.response_map)
+        df["Response"] = df["key_resp.keys"].replace(self.response_map).infer_objects(copy=False)
         return df
 
     @staticmethod
@@ -90,19 +90,19 @@ class DataProcessor:
 
     @staticmethod
     def _compute_accuracy(df: pd.DataFrame) -> pd.Series:
-        return (df.groupby("participant_id")["Choice Accuracy"].mean() * 100).copy()
+        return (df.groupby("participant_id", observed=False)["Choice Accuracy"].mean() * 100).copy()
 
     @staticmethod
     def _compute_performance(df: pd.DataFrame) -> pd.Series:
         max_expected_reward = (
-            df.groupby(["participant_id"])["expected_reward_if_correct"]
+            df.groupby(["participant_id"], observed=False)["expected_reward_if_correct"]
             .mean()
             .unique()[0]
         )
 
         return (
             df[df["block_type"] == "test"]
-            .groupby("participant_id")["expected_reward"]
+            .groupby("participant_id", observed=False)["expected_reward"]
             .mean()
             / max_expected_reward
             * 100
@@ -201,7 +201,7 @@ def compute_performance_metrics(df: pd.DataFrame | None = None) -> pd.DataFrame:
         df = get_processed_data()
 
     # compute performance metrics
-    perf = df.groupby("id")[["performance", "accuracy", "above_chance"]].mean()
+    perf = df.groupby("id", observed=False)[["performance", "accuracy", "above_chance"]].mean()
     perf["above_chance"] = perf["above_chance"].astype(bool)
 
     return perf.reset_index()

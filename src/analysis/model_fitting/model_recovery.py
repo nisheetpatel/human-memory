@@ -62,7 +62,7 @@ df["lmda_gen"] = df["Participant ID"].apply(lambda x: x.split("_")[1])
 df["lmda_gen"] = df["lmda_gen"].astype(float)
 
 # model selection
-idx = df.dropna().groupby(["Model_gen", "lmda_gen"])["NLL"].idxmin()
+idx = df.dropna().groupby(["Model_gen", "lmda_gen"], observed=False)["NLL"].idxmin()
 best_df = df.loc[idx].reset_index(drop=True)
 best_df.replace({"DDRA": "DRA", "DFreqRA": "Frequency", "DStakesRA": "Stakes", "DEqualRA": "Equal Precision"}, inplace=True)
 
@@ -125,7 +125,7 @@ from definitions import DATA_PATH
 
 df = pd.read_csv(DATA_PATH+"all_fit_results_fixed_sb_cross-validated_new.csv")
 df["log-lmda"] = np.log10(df["lmda"])
-idx = df.dropna().groupby(["id"])["NLL"].idxmin()
+idx = df.dropna().groupby(["id"], observed=False)["NLL"].idxmin()
 best_df = df.loc[idx].reset_index(drop=True)
 
 
