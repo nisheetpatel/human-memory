@@ -67,7 +67,7 @@ class DataProcessor:
         return df
 
     def _add_response(self, df: pd.DataFrame) -> pd.DataFrame:
-        df["Response"] = df["key_resp.keys"].replace(self.response_map).infer_objects(copy=False)
+        df["Response"] = df["key_resp.keys"].apply(lambda key: self.response_map.get(key, key))
         return df
 
     @staticmethod
@@ -173,15 +173,15 @@ class DataProcessor:
 
         for file in files:
             df = pd.read_csv(f"{self.path}{file}")
+            df = df.pipe(self._extract_data_partition)
+            df = df.pipe(self._rename_columns)
+            df = df.pipe(self._add_block_id)
+            df = df.pipe(self._add_difficulty)
+            df = df.pipe(self._add_response)
+            df = df.pipe(self._update_slot_machine_ids)
             dfs.append(df)
 
         df = pd.concat(dfs).reset_index(drop=True)
-        df = df.pipe(self._extract_data_partition)
-        df = df.pipe(self._rename_columns)
-        df = df.pipe(self._add_block_id)
-        df = df.pipe(self._add_difficulty)
-        df = df.pipe(self._add_response)
-        df = df.pipe(self._update_slot_machine_ids)
         df = df.pipe(self._compute_expected_reward)
         df = df.pipe(self._convert_object_cols_to_categorical)
         df = df.pipe(self._sort_by_performance)
