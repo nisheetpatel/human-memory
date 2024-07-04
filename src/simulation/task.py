@@ -89,12 +89,14 @@ class SlotMachinesTaskWithPredefinedData:
         done = True
         info = {"sm_id": state // 4, "return": rtrn, "price": price}
 
+        # increase trial counter
+        self.current_trial += 1
+
         return next_state, reward, done, info
 
     def reset(self) -> tuple[int, float]:        
-        self.current_trial += 1
         try:
-            state, _, price = self.predefined_data[self.current_trial]
+            state, price, _ = self.predefined_data[self.current_trial]
             return state // 4, price
         except IndexError:
             print(f"Reached final trial {self.current_trial}")

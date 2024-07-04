@@ -1,11 +1,8 @@
 import pandas as pd
 
 from src.simulation.models import DRA, Agent
-from src.simulation.task import (
-    Env,
-    SlotMachinesTask,
-    SlotMachinesTaskWithPredefinedData,
-)
+from src.simulation.task import (Env, SlotMachinesTask,
+                                 SlotMachinesTaskWithPredefinedData)
 
 
 class Simulator:
@@ -24,7 +21,7 @@ class Simulator:
             self.n_episodes = n_episodes
         else:
             self.env = SlotMachinesTaskWithPredefinedData(predefined_data)
-            self.n_episodes = len(predefined_data) - 1
+            self.n_episodes = len(predefined_data)
 
     def run_episode(self) -> tuple[int, float, float, float, bool]:
         sm_id, price = self.env.reset()
