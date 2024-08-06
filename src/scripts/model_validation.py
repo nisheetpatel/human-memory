@@ -110,27 +110,8 @@ def compute_performance_metrics(df_choice: pd.DataFrame) -> pd.DataFrame:
     df_perf = pd.merge(left=perf, right=accuracy, left_on=["participant_id", "Model"], right_on=["participant_id", "Model"]).reset_index()
     return df_perf
 
-# n_runs = 100
-# model_classes = [DRA, FreqRA, StakesRA, EqualRA]
-# dfs_perf = []
 
-# for run in range(n_runs):
-#     print(f"Run {run+1}/{n_runs}")
-
-#     dfs_choice = []
-#     for model_class in model_classes:
-#         exp = ExperimentBestFitParams(model_class=model_class, params_and_data=get_params_and_data_for_model(model_class))
-#         exp.run()
-#         dfs_choice += [exp.extract_choice_data()]
-
-#     df_choice = pd.concat(dfs_choice, ignore_index=True)
-#     dfs_perf.append(compute_performance_metrics(df_choice))
-
-# df_perf = pd.concat(dfs_perf, ignore_index=True)
-
-# switch loops around for efficiency
-
-n_runs = 10
+n_runs = 100
 model_classes = [DRA, FreqRA, StakesRA, EqualRA]
 dfs_perf = []
 
