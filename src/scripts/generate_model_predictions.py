@@ -8,14 +8,14 @@ from src.simulation.models import (
     DRA,
     EqualRA,
     FreqRA,
-    MaxEntRL,
+    # MaxEntRL,
     StakesRA,
 )
 
 
 def main():
     dfs_choice = []
-    for model_class in [DRA, FreqRA, StakesRA, EqualRA, MaxEntRL]:
+    for model_class in [DRA, FreqRA, StakesRA, EqualRA]:
         exp = Experiment(model_class=model_class, n_params=100, n_episodes=1_000)
         exp.run()
         dfs_choice += [exp.extract_choice_data()]
@@ -24,6 +24,22 @@ def main():
     plot_logit_preds(df_choice, save_name="model-preds.png")
 
     # # sns.set(font_scale=2)
+    # g = sns.lmplot(
+    #     data=df_choice,
+    #     x="price",
+    #     y="action",
+    #     hue="sm_id",
+    #     style="sm_id",
+    #     col="Model",
+    #     logistic=True,
+    #     scatter=False,
+    #     ci=None,
+    #     palette=sns.color_palette(n_colors=4),
+    # )
+    # g.set(xticks=df_choice["price"].unique())
+    # plt.savefig("./model-predictions.png")
+    # plt.close()
+
     # fig = sns.relplot(
     #     data=df_choice,
     #     x="price",
@@ -38,7 +54,6 @@ def main():
     # # plt.show()
     # plt.savefig("./model-predictions.png")
     # plt.close()
-
 
 if __name__ == "__main__":
     main()
