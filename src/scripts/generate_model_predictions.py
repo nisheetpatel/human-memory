@@ -8,14 +8,15 @@ from src.simulation.models import (
     DRA,
     EqualRA,
     FreqRA,
-    # MaxEntRL,
     StakesRA,
 )
 
+MODEL_CLASSES = [DRA, FreqRA, StakesRA, EqualRA]
+# MODEL_CLASSES = [RL, MaxEntRL, OptimalBIO, SoftmaxBIO, ProbTBIO]
 
 def main():
     dfs_choice = []
-    for model_class in [DRA, FreqRA, StakesRA, EqualRA]:
+    for model_class in MODEL_CLASSES:
         exp = Experiment(model_class=model_class, n_params=100, n_episodes=1_000)
         exp.run()
         dfs_choice += [exp.extract_choice_data()]

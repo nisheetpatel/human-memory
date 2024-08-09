@@ -167,9 +167,49 @@ for ax in g.axes.flat:
     ax.plot([0, 100], [0, 100], 'r--', linewidth=2)
     ax.set_xlim(0, 100)
     ax.set_ylim(0, 100)
-    ax.set_xlabel('Model performance')
-    ax.set_ylabel('Participant performance')
+    ax.set_xlabel('Participant performance')
+    ax.set_ylabel('Model performance')
 
 # Adjust the layout and show the plot
 plt.tight_layout()
+plt.show()
+
+
+##########################################
+# taking into account model classes
+##########################################
+
+# read the dataframe with model classes and update model names
+df_classes = pd.read_csv(DATA_PATH + 'model_classes.csv')
+class_map = {"DRA": "DRA", "Stakes": "StakesRA", "Freq": "FreqRA", "EP": "EqualRA"}
+df_classes["class_bads"] = df_classes["class_bads"].map(class_map)
+df_classes["class_bhlr"] = df_classes["class_bhlr"].map(class_map)
+
+# define combos to keep
+combos_to_keep = list(df_classes.loc[:, ["id", "class_bads", "class_bhlr"]].itertuples(index=False, name=None))
+
+# Create a dictionary for faster lookup
+valid_combos = {}
+for combo in combos_to_keep:
+    id, model1, model2 = combo
+    if id not in valid_combos:
+        valid_combos[id] = set()
+    valid_combos[id].add(model1)
+    valid_combos[id].add(model2)
+
+# Define a function to check if a row should be kept
+def keep_row(row):
+    return row['id'] in valid_combos and row['Model'] in valid_combos[row['id']]
+
+# Apply the filter
+filtered_perf = perf[perf.apply(keep_row, axis=1)]
+
+# Reset the index if needed
+filtered_perf = filtered_perf.reset_index(drop=True)
+
+# plot mean differences
+sns.barplot(x='Model', y='model_perf_diff', data=perf)
+plt.title('Mean Performance Difference from Data (red dots only)')
+plt.xlabel('Model')
+plt.ylabel('Absolute Difference')
 plt.show()
