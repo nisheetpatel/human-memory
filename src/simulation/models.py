@@ -162,7 +162,7 @@ class RL:
         self.v = np.array([0., 0., 0., 0.])
 
     def action_prob(self, sm_id: int, price: float) -> np.ndarray:
-        return np.argmax(np.array([self.v[sm_id] - price, 0]))
+        return softargmax(np.array([self.v[sm_id] - price, 0]), 1e10)
 
     def act(self, sm_id: int, price: float):
         return np.random.choice([0,1], p=self.action_prob(sm_id, price))
