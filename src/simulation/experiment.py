@@ -39,10 +39,11 @@ ParamClass = Union[RAModelParams, RLModelParams, BIOModelParams]
 
 
 class ParamGenerator:
-    def __init__(self, param_class: ParamClass, N: int = 100) -> None:
+    def __init__(self, param_class: ParamClass, N: int = 100, scale_lognormal: float = 0.5) -> None:
         self.param_class = param_class
         self.params = param_class()
         self.N = N
+        self.scale_lognormal = scale_lognormal
 
     def _get_arg_vals(self):
         return [self.params.__getattribute__(key) for key in self.params.__match_args__]
@@ -52,7 +53,7 @@ class ParamGenerator:
 
     def generate_lognormal_params(self):
         args = self._get_arg_vals()
-        param_dist = np.random.lognormal(np.log(args), 0.5, (self.N, len(args)))
+        param_dist = np.random.lognormal(np.log(args), self.scale_lognormal, (self.N, len(args)))
         if self.param_class == BIOModelParams:
             param_dist = np.random.normal(args, 0, (self.N, len(args)))
         return [self._get_params_class(param_vals) for param_vals in param_dist]
@@ -76,9 +77,9 @@ def get_param_class(model_class: Agent) -> ParamClass:
 
 
 class Experiment:
-    def __init__(self, model_class: Agent, n_params: int = 100, n_episodes: int = 1_000) -> None:
+    def __init__(self, model_class: Agent, n_params: int = 100, n_episodes: int = 1_000, scale_lognormal: float = 0.5) -> None:
         # generate distribution of parameters for the agent
-        param_generator = ParamGenerator(get_param_class(model_class), N=n_params)
+        param_generator = ParamGenerator(get_param_class(model_class), N=n_params, scale_lognormal=scale_lognormal)
         params_list = param_generator.generate_lognormal_params()
 
         # define agents
