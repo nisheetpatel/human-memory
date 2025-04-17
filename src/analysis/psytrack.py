@@ -6,7 +6,7 @@ import pandas as pd
 import psytrack
 from matplotlib import pyplot as plt
 
-from analysis.hierarchical import clean_data
+from src.data.stan_preparation import prepare_for_logit
 
 
 class PsytrackModel:
@@ -28,7 +28,7 @@ class PsytrackModel:
     def _organize_data(data: pd.DataFrame) -> dict:
         """Organize data for psytrack."""
         if "X1" not in data.columns:
-            data = clean_data(data, test_only=False)
+            data = prepare_for_logit(data, test_only=False)
         return {
             "inputs": {
                 "x1": np.asarray(data["X1"]).reshape(-1, 1),

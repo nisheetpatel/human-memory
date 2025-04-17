@@ -3,11 +3,13 @@ __pycache__
 *.pyc
 .mypy_cache/
 
+# psychopy experiment folder
+expt_psychopy/
 
 # local folders
-figures/
-data/
-models/
+/figures/
+/data/
+/models/
 
 # data files
 *.npz

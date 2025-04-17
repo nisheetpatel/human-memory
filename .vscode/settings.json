@@ -1,13 +1,17 @@
 {
   "[python]": {
-    "editor.defaultFormatter": null
+    "editor.defaultFormatter": null,
   },
+  "python.linting.enabled": true,
+  "python.linting.ruffEnabled": true,
+  "python.linting.ruffPath": "../.venv/bin/ruff",
+  "python.linting.ruffArgs": [
+    "--config",
+    "../pyproject.toml"
+  ],
   "editor.formatOnSaveMode": "file",
   "editor.formatOnSave": true,
   "editor.codeActionsOnSave": {
     "source.organizeImports": "explicit"
   },
-  "python.linting.pylintEnabled": true,
-  "python.linting.enabled": true,
-  "python.formatting.provider": "black"
 }
